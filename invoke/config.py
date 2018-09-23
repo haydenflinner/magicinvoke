@@ -111,7 +111,7 @@ class DataProxy(object):
         # having a config key accidentally shadow a real attribute or method).
         try:
             return self._get(key)
-        except KeyError:
+        except KeyError as e:
             # Proxy most special vars to config for dict procotol.
             if key in self._proxies:
                 return getattr(self._config, key)
@@ -122,7 +122,7 @@ class DataProxy(object):
                 sorted(list(self._config.keys()))
             )
             err += "\n\nValid real attributes: {!r}".format(attrs)
-            raise AttributeError(err)
+        raise AttributeError(err)
 
     def __setattr__(self, key, value):
         # Turn attribute-sets into config updates anytime we don't have a real
