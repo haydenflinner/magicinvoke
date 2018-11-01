@@ -29,7 +29,7 @@ To find out what's new in this version of Invoke, please see `the changelog
 
 
 setup(
-    name="invoke",
+    name="magicinvoke",
     version=version,
     description="Pythonic task execution",
     license="BSD",
@@ -41,8 +41,8 @@ setup(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "invoke = invoke.main:program.run",
-            "inv = invoke.main:program.run",
+            "magicinvoke = invoke.main:program.run",
+            "magicinv = invoke.main:program.run",
         ]
     },
     classifiers=[

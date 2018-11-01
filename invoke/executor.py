@@ -148,9 +148,10 @@ class Executor(object):
 
             # This special case for len == 0 tells me that maybe we should rename
             # checks to skip_if
-            if failed_check or len(c.checks) == 0:
+            if failed_check:
                 debug("Running {} because {} returned {}".format(
                     c.name, check_call.name, result))
+            if failed_check or len(c.checks) == 0:
                 run_call(c)
             else:
                 debug("All {} checks for {} passed".format(len(c.checks), c.name))
