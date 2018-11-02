@@ -164,7 +164,13 @@ class ParserContext(object):
         """
         ret = {}
         for arg in self.args.values():
-            ret[arg.name] = arg.value
+            # TODO remove this ugly hack, but without understanding invoke better,
+            # I'm not sure how else to disambiguate between when invoke gives a task
+            # its default argument and when someone explicitly passes that argument.
+            if arg.value_or_none is not None:
+                ret[arg.name] = arg.value_or_none
+                print(ret[arg.name])
+        print("as_kwargs returning {}".format(ret))
         return ret
 
     def names_for(self, flag):

@@ -138,23 +138,20 @@ class Executor(object):
                 results[call.task] = result
                 return result
 
-            failed_check = None
-            for check_task in c.checks:
+            skipped_because = None
+            for check_task in c.skip_ifs:
                 check_call = Call(task=check_task)
-                result = run_call(check_call)
-                if not result:
-                    failed_check = check_call
+                skip = run_call(check_call)
+                if skip:
+                    skipped_because = skip
                     break
 
-            # This special case for len == 0 tells me that maybe we should rename
-            # checks to skip_if
-            if failed_check:
-                debug("Running {} because {} returned {}".format(
-                    c.name, check_call.name, result))
-            if failed_check or len(c.checks) == 0:
-                run_call(c)
+            if skipped_because:
+                debug("Skipping {} because {} returned {}".format(
+                    c.name, check_call.name, skipped_because))
             else:
-                debug("All {} checks for {} passed".format(len(c.checks), c.name))
+                debug("All {} checks for {} passed".format(len(c.skip_ifs), c.name))
+                run_call(c)
 
         return results
 

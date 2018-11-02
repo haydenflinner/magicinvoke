@@ -56,7 +56,7 @@ class Task(object):
         auto_shortflags=True,
         help=None,
         pre=None,
-        checks=None,
+        skip_ifs=None,
         post=None,
         autoprint=False,
         iterable=None,
@@ -83,7 +83,7 @@ class Task(object):
         self.help = help or {}
         # Call chain bidness
         self.pre = pre or []
-        self.checks = checks or []
+        self.skip_ifs = skip_ifs or []
         self.post = post or []
         self.times_called = 0
         # Whether to print return value post-execution

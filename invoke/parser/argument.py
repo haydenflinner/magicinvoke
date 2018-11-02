@@ -115,6 +115,10 @@ class Argument(object):
     def value(self):
         return self._value if self._value is not None else self.default
 
+    @property
+    def value_or_none(self):
+        return self._value
+
     @value.setter
     def value(self, arg):
         self.set_value(arg, cast=True)
