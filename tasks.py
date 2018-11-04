@@ -85,8 +85,11 @@ ns = Collection(
     travis,
     checks.blacken,
 )
+docs.configure({'sphinx': {'source': 'sites/magic_docs', 'target': 'sites/magic_docs/_build', 'target_file': 'index.html'}})
+
 ns.configure(
     {
+        "run": { "echo": True},
         "blacken": {
             # Skip the vendor directory and the (Travis-only) alt venv when
             # blackening.

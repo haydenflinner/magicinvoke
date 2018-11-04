@@ -7,7 +7,7 @@ import sys
 
 # Version info -- read without importing
 _locals = {}
-with open("invoke/_version.py") as fp:
+with open("magicinvoke/_version.py") as fp:
     exec(fp.read(), None, _locals)
 version = _locals["__version__"]
 
@@ -23,7 +23,7 @@ To find out what's new in this version of Invoke, please see `the changelog
 <http://pyinvoke.org/changelog.html#{}>`_.
 
 {}
-""".format(
+""".format( # TODO replace this pyinvoke link, too
     version, text
 )
 
@@ -31,22 +31,21 @@ To find out what's new in this version of Invoke, please see `the changelog
 setup(
     name="magicinvoke",
     version=version,
-    description="Pythonic task execution",
+    description="Pythonic task execution -- Based on invoke by Jeff Forcier",
     license="BSD",
     long_description=long_description,
-    author="Jeff Forcier",
-    author_email="jeff@bitprophet.org",
-    url="http://docs.pyinvoke.org",
+    author="Hayden Flinner",
+    author_email="haydenflinner@gmail.com",
+    url="http://docs.pyinvoke.org", # TODO github pages host our addendum
     packages=find_packages(exclude=exclude),
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "magicinvoke = invoke.main:program.run",
-            "magicinv = invoke.main:program.run",
+            "invoke = invoke.main:program.run",
+            "inv = invoke.main:program.run",
         ]
     },
     classifiers=[
-        "Development Status :: 5 - Production/Stable",
         "Environment :: Console",
         "Intended Audience :: Developers",
         "Intended Audience :: System Administrators",
@@ -62,6 +61,7 @@ setup(
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         "Topic :: Software Development",
         "Topic :: Software Development :: Build Tools",
         "Topic :: Software Development :: Libraries",
