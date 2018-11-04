@@ -169,8 +169,6 @@ class ParserContext(object):
             # its default argument and when someone explicitly passes that argument.
             if arg.value_or_none is not None:
                 ret[arg.name] = arg.value_or_none
-                print(ret[arg.name])
-        print("as_kwargs returning {}".format(ret))
         return ret
 
     def names_for(self, flag):

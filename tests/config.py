@@ -160,8 +160,8 @@ class Config_:
 
         @patch.object(Config, "_load_yaml")
         def configure_runtime_path(self, load_yaml):
-            Config(runtime_path="some/path.yaml").load_runtime()
-            load_yaml.assert_any_call("some/path.yaml")
+            Config(runtime_path="configs/echo.yaml").load_runtime()
+            load_yaml.assert_any_call("configs/echo.yaml")
 
         def accepts_defaults_dict_kwarg(self):
             c = Config(defaults={"super": "low level"})
