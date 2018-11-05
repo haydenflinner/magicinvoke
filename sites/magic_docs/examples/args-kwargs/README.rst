@@ -1,31 +1,18 @@
 =======================================
-File dependency resolution!
+``*args`` and ``**kwargs`` support!
 =======================================
+.. _args-kwargs:
 
 Try it!
 --------
-``pip install structlog`` 
+``invoke run mytask these are positional --flag1 keyword!``::
 
-``invoke run``
+    invoke myfunc hi this is another positional --flag1 hi --flag2 there
+    ('hi', 'this', 'is', 'another', 'positional') {'flag1': 'hi', 'flag2': 'there'}
 
-This was a test project used to test the file timestamp recognition,
-pasted here for reference.
-
-invoke.py
-----------
-
-.. literalinclude:: invoke.py
-   :linenos:
-   :language: python
-
- 
 tasks.py
 --------
 
-Note the function ``testcompile``, which is just a wrapper for compile
-that doesn't have to know anything about the parameters it takes!
-
 .. literalinclude:: tasks.py
    :linenos:
-   :emphasize-lines: 25-27
    :language: python

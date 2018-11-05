@@ -12,7 +12,8 @@ env / config.
 I don't like that skip_ifs have to be tasks, but I'm too lazy to
 fix since I added ``@skippable.``
 
-I also don't like that skip_ifs is required (why not skip_if?)
+I also don't like that skip_ifs is required to be a list
+(why not skip_if?)
 why not skip_ifs with func instead of iterable?
 
 tasks.py

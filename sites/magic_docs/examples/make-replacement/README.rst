@@ -1,31 +1,29 @@
 =======================================
 File dependency resolution!
 =======================================
+.. _make-replacement:
 
 Try it!
 --------
 ``pip install structlog`` 
 
-``invoke run``
+``invoke write-all-the-programs run``
 
-This was a test project used to test the file timestamp recognition,
-pasted here for reference.
+You should end up with an executable under ``ws/`` that exits with code 255.
 
-invoke.py
-----------
-
-.. literalinclude:: invoke.py
-   :linenos:
-   :language: python
-
- 
-tasks.py
---------
+**tasks.py**
 
 Note the function ``testcompile``, which is just a wrapper for compile
 that doesn't have to know anything about the parameters it takes!
+That's because of :meth:`magicinvoke.get_params_from_ctx`, which was applied by
+:meth:`magicinvoke.magictask`.
 
 .. literalinclude:: tasks.py
    :linenos:
-   :emphasize-lines: 25-27
+   :language: python
+
+**invoke.py**
+
+.. literalinclude:: invoke.py
+   :linenos:
    :language: python

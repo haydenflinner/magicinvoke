@@ -366,7 +366,7 @@ def magictask(*args, **kwargs):
         List of extras over `invoke.Task`
 
         1. You can configure your Tasks just like you configure invoke's `run`
-           function. See :meth:`magicinvoke.get_params_from_ctx`` for more::
+           function. See :meth:`magicinvoke.get_params_from_ctx` for more::
 
                @magictask
                def thisisatask(ctx, arg1):
