@@ -13,5 +13,5 @@ autodoc_default_flags = ["members", "special-members"]
 
 # Sister-site links to WWW
 html_theme_options["extra_nav_links"] = {
-    "Invoke's website": "http://www.pyinvoke.org"
+    "Main website": "http://www.pyinvoke.org"
 }
