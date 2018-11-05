@@ -109,6 +109,7 @@ class Executor(object):
         # especially given Executor is not designed to execute() >1 time at the
         # moment...
         for c in calls:
+
             def run_call(call):
                 autoprint = call in direct and call.autoprint
                 args = call.args
@@ -120,7 +121,9 @@ class Executor(object):
                 # (collection & shell env)
                 # TODO: load_collection needs to be skipped if task is anonymous
                 # (Fabric 2 or other subclassing libs only)
-                collection_config = self.collection.configuration(call.called_as)
+                collection_config = self.collection.configuration(
+                    call.called_as
+                )
                 config.load_collection(collection_config)
                 config.load_shell_env()
                 debug("Finished loading collection & shell env configs")
@@ -149,10 +152,17 @@ class Executor(object):
                     break
 
             if skipped_because:
-                debug("Skipping {} because {} returned {}".format(
-                    c.name, check_call.name, skipped_because))
+                debug(
+                    "Skipping {} because {} returned {}".format(
+                        c.name, check_call.name, skipped_because
+                    )
+                )
             else:
-                debug("All {} checks for {} passed".format(len(c.skip_ifs), c.name))
+                debug(
+                    "All {} checks for {} passed".format(
+                        len(c.skip_ifs), c.name
+                    )
+                )
                 run_call(c)
 
         return results
@@ -175,8 +185,12 @@ class Executor(object):
                 varargs, kwargs = task.as_varargs_and_kwargs
             else:
                 name, kwargs = task
-            c = Call(task=self.collection[name],
-                     varargs=varargs, kwargs=kwargs, called_as=name)
+            c = Call(
+                task=self.collection[name],
+                varargs=varargs,
+                kwargs=kwargs,
+                called_as=name,
+            )
             calls.append(c)
         if not tasks and self.collection.default is not None:
             calls = [Call(task=self.collection[self.collection.default])]
@@ -216,9 +230,11 @@ class Executor(object):
         .. versionadded:: 1.0
         """
         ret = []
-        if not getattr(calls, '__iter__', False):
-            raise ValueError("Expected iterable! Did you do "
-                "pre=mytask instead of pre=[mytask]?")
+        if not getattr(calls, "__iter__", False):
+            raise ValueError(
+                "Expected iterable! Did you do "
+                "pre=mytask instead of pre=[mytask]?"
+            )
 
         for call in calls:
             # Normalize to Call (this method is sometimes called with pre/post

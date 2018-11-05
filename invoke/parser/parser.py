@@ -244,12 +244,18 @@ class ParseMachine(StateMachine):
             self.see_unknown(token)
             return
         # Flag
-        if self.context and (token in self.context.flags
-                             or self.context.eat_all and is_flag(token)):
+        if self.context and (
+            token in self.context.flags
+            or self.context.eat_all
+            and is_flag(token)
+        ):
             debug("Saw flag {!r}".format(token))
             self.switch_to_flag(token)
-        elif self.context and (token in self.context.inverse_flags
-                               or self.context.eat_all and is_flag(token)):
+        elif self.context and (
+            token in self.context.inverse_flags
+            or self.context.eat_all
+            and is_flag(token)
+        ):
             debug("Saw inverse flag {!r}".format(token))
             self.switch_to_flag(token, inverse=True)
         # Value for current flag
@@ -263,8 +269,9 @@ class ParseMachine(StateMachine):
         # Positional args (must come above context-name check in case we still
         # need a posarg and the user legitimately wants to give it a value that
         # just happens to be a valid context name.)
-        elif self.context and (self.context.missing_positional_args
-                               or self.context.eat_all):
+        elif self.context and (
+            self.context.missing_positional_args or self.context.eat_all
+        ):
             msg = "Context {!r} requires positional args, eating {!r}"
             debug(msg.format(self.context, token))
             self.see_positional_arg(token)
@@ -390,7 +397,7 @@ class ParseMachine(StateMachine):
             if not self.context.eat_all:
                 # TODO 378 other possibilities?
                 raise ParseError("Received unknown flag")
-            self.context.add_arg(Argument(name=flag.lstrip('-')))
+            self.context.add_arg(Argument(name=flag.lstrip("-")))
         self.flag = self.context.flags[flag]
         debug("Moving to flag {!r}".format(self.flag))
         # Bookkeeping for iterable-type flags (where the typical 'value

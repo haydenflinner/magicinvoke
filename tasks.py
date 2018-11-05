@@ -85,17 +85,25 @@ ns = Collection(
     travis,
     checks.blacken,
 )
-docs.configure({'sphinx': {'source': 'sites/magic_docs', 'target': 'sites/magic_docs/_build', 'target_file': 'index.html'}})
+docs.configure(
+    {
+        "sphinx": {
+            "source": "sites/magic_docs",
+            "target": "sites/magic_docs/_build",
+            "target_file": "index.html",
+        }
+    }
+)
 
 ns.configure(
     {
-        "run": { "echo": True},
+        "run": {"echo": True},
         "blacken": {
             # Skip the vendor directory and the (Travis-only) alt venv when
             # blackening.
             # TODO: this is making it seem like I really do want an explicit
             # arg/conf-opt in the blacken task for "excluded paths"...ha
-            "find_opts": "-and -not \( -path './invoke/vendor*' -or -path './alt_env*' -or -path './build*' \)"  # noqa
+            "find_opts": "-and -not \( -path 'sites/*' -or -path './magicinvoke/vendor*' -or -path './invoke/vendor*' -or -path './alt_env*' -or -path './build*' \)"  # noqa
         },
         "tests": {"logformat": LOG_FORMAT, "package": "invoke"},
         "travis": {

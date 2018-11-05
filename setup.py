@@ -23,7 +23,7 @@ To find out what's new in this version of Invoke, please see `the changelog
 <http://pyinvoke.org/changelog.html#{}>`_.
 
 {}
-""".format( # TODO replace this pyinvoke link, too
+""".format(  # TODO replace this pyinvoke link, too
     version, text
 )
 
@@ -36,7 +36,7 @@ setup(
     long_description=long_description,
     author="Hayden Flinner",
     author_email="haydenflinner@gmail.com",
-    url="http://docs.pyinvoke.org", # TODO github pages host our addendum
+    url="http://docs.pyinvoke.org",  # TODO github pages host our addendum
     packages=find_packages(exclude=exclude),
     include_package_data=True,
     entry_points={

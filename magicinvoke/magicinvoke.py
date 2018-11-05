@@ -4,12 +4,18 @@ import itertools
 
 from invoke import task, Collection
 from invoke.tasks import Task
-from invoke.vendor.decorator import decorator, getfullargspec, FunctionMaker, decorate
+from invoke.vendor.decorator import (
+    decorator,
+    getfullargspec,
+    FunctionMaker,
+    decorate,
+)
 
 try:
-    from pathlib import Path   # Py3
+    from pathlib import Path  # Py3
 except:
     from pathlib2 import Path  # Py2
+
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     """
@@ -132,7 +138,10 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     .. versionadded:: 0.1
     """
     if func is None:  # Dirty hack taken from the wrapt documentation :)
-        return partial(get_params_from_ctx, derive_kwargs=derive_kwargs, path=path)
+        return partial(
+            get_params_from_ctx, derive_kwargs=derive_kwargs, path=path
+        )
+
     def create_decorator():
         """
         A decorator that wraps a function in a function with the same argument list,
@@ -144,7 +153,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         def customized_default_decorator(*args, **kwargs):
             # __call__ on Task will handle the error before us if ctx wasn't passed
             directly_passed = get_directly_passed(func, args, kwargs)
-            ctx = directly_passed['ctx']
+            ctx = directly_passed["ctx"]
 
             def call_callback_or_error(param_name):
                 err = None
@@ -152,32 +161,38 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 try:
                     result_cache = derive_kwargs(ctx) if derive_kwargs else {}
                 except AttributeError as e:
-                    err = ("Failed to get parameter values from your derive_kwargs function!\n"
-                           "Exception encountered:\n{}".format(e.args[0]))
+                    err = (
+                        "Failed to get parameter values from your derive_kwargs function!\n"
+                        "Exception encountered:\n{}".format(e.args[0])
+                    )
                 if err:
                     raise AttributeError(err)
 
                 return result_cache.get(param_name, None)
 
-
-            def fell_through(): # Cheapest sentinel I can come up with
+            def fell_through():  # Cheapest sentinel I can come up with
                 pass
 
             args_passing = {}
             expecting = getfullargspec(func).args
             for param_name in expecting:
                 # Decide through cascading what to use as the value for each parameter
-                passing = (directly_passed.get(param_name, None) # First, positionals and kwargs
-                           or ctx.config.get(path or func.__name__, {}).get(param_name, None)
-                           or call_callback_or_error(param_name)
-                           or fell_through)
+                passing = (
+                    directly_passed.get(
+                        param_name, None
+                    )  # First, positionals and kwargs
+                    or ctx.config.get(path or func.__name__, {}).get(
+                        param_name, None
+                    )
+                    or call_callback_or_error(param_name)
+                    or fell_through
+                )
                 if passing != fell_through:
                     args_passing[param_name] = passing
 
             # Now that we've generated a kwargs dict that is everything we know about how to call
             # this function, call it!
             return func(**args_passing)
-
 
         # Basically, now that we've generated a decorator that will derive the right values for
         # arguments to pass through to the task, we need to generate a function with the same signature
@@ -186,7 +201,9 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         # the original function before we decorate it) at runtime, but such is life.
         params = getfullargspec(func)
         defaults = params.defaults or ()  # replace None with ()
-        num_posargs = len(params.args) - len(defaults) - 1  # -1 -> don't provide default for ctx
+        num_posargs = (
+            len(params.args) - len(defaults) - 1
+        )  # -1 -> don't provide default for ctx
 
         # As far as I can tell from reading the decorator module's documentation, there is no
         # way to generate a function with a runtime-decided header in Python in a similar way to
@@ -196,24 +213,29 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         # one modification.
         evaldict = dict(_call_=customized_default_decorator, _func_=func)
         generated_function = FunctionMaker.create(
-            func, "return _call_(%(shortsignature)s)",
-            evaldict, __wrapped__=func,
+            func,
+            "return _call_(%(shortsignature)s)",
+            evaldict,
+            __wrapped__=func,
             # Prepend to real function's defaults with Nones. We have to do this because invoke
             # will make the user provide positional arguments, even if there's a good value in ctx.
             # We zip with original defaults (instead of just all None) to get proper type-hinting
             # for cmd-line help.
             # TODO py3 - use defaults of same type as annotation for each param
             # (since None defaults to string in invoke)
-            defaults=tuple(itertools.chain(itertools.repeat(None, num_posargs), defaults)),
+            defaults=tuple(
+                itertools.chain(itertools.repeat(None, num_posargs), defaults)
+            ),
         )
         return generated_function
 
     return create_decorator()
 
 
-InputPath = 'input'
-OutputPath = 'output'
-Skipped = 'Skipped because output files newer than all input files.'
+InputPath = "input"
+OutputPath = "output"
+Skipped = "Skipped because output files newer than all input files."
+
 
 @decorator
 def skippable(func, *args, **kwargs):
@@ -276,7 +298,7 @@ def skippable(func, *args, **kwargs):
         >>>from_list(['xyz'])
         ('xyz')
         """
-        if not(isinstance(val, list) or isinstance(val, tuple)):
+        if not (isinstance(val, list) or isinstance(val, tuple)):
             # I don't like checking types explicitly in python, but I can't think of a more
             # reliable way that wouldn't include strings in py2.
             # Could try the *operator on each value
@@ -285,17 +307,27 @@ def skippable(func, *args, **kwargs):
         else:
             return val
 
-    filtered_args = lambda tester: itertools.chain.from_iterable(from_list(runtime_value)
-                                                        for argname, runtime_value in name_to_arg.items()
-                                                        if tester(argname, runtime_value))
+    filtered_args = lambda tester: itertools.chain.from_iterable(
+        from_list(runtime_value)
+        for argname, runtime_value in name_to_arg.items()
+        if tester(argname, runtime_value)
+    )
 
     def tester(type_annotation, words_to_match, argname, runtime_value):
         # Runtime_value could be either a string, or a list of strings!
         annot = from_list(argspec.annotations.get(argname))[0]
-        return annot and annot is type_annotation or any(w in argname.lower() for w in words_to_match)
+        return (
+            annot
+            and annot is type_annotation
+            or any(w in argname.lower() for w in words_to_match)
+        )
 
-    output_filenames = list(filtered_args(partial(tester, OutputPath, [OutputPath])))
-    input_filenames = list(filtered_args(partial(tester, InputPath, [InputPath, 'path', 'file'])))
+    output_filenames = list(
+        filtered_args(partial(tester, OutputPath, [OutputPath]))
+    )
+    input_filenames = list(
+        filtered_args(partial(tester, InputPath, [InputPath, "path", "file"]))
+    )
     # Because we suck in anything that has 'path' or 'file' in the name as Inputs, we've probably matched
     # with some output variables too. Let's just discard those.
     input_filenames = set(input_filenames) ^ set(output_filenames)
@@ -317,7 +349,7 @@ def timestamp_differ(input_filenames, output_filenames):
     """
     # Always run things that don't produce a file or depend on files.
     if not input_filenames or not output_filenames:
-        #log.debug(event="ts_differ.have_to_run", skipping=False)
+        # log.debug(event="ts_differ.have_to_run", skipping=False)
         return False
 
     # If any files are missing (whether inputs or outputs),
@@ -326,21 +358,24 @@ def timestamp_differ(input_filenames, output_filenames):
     # ignore that it was supposed to do something.
     paths = itertools.chain(input_filenames, output_filenames)
     if any(not Path(p).exists() for p in paths):
-        #log.debug(event="ts_differ.filemissing", skipping=False, paths=paths)
+        # log.debug(event="ts_differ.filemissing", skipping=False, paths=paths)
         return False
 
     # All exist, now make sure oldest output is older than youngest input.
-    PathInfo = collections.namedtuple('PathInfo', ['path', 'modified'])
+    PathInfo = collections.namedtuple("PathInfo", ["path", "modified"])
+
     def sort_by_timestamps(l):
         l = (PathInfo(path, Path(path).stat().st_mtime) for path in l)
         return sorted(l, key=lambda pi: pi.modified)
+
     oldest_output = sort_by_timestamps(output_filenames)[0]
     youngest_input = sort_by_timestamps(input_filenames)[-1]
     skipping = youngest_input.modified < oldest_output.modified
-    #log.debug(event="ts_differ.all_files_exist", 
-                #youngest_input=youngest_input.path, oldest_output=oldest_output.path,
-                #skipping=skipping)
+    # log.debug(event="ts_differ.all_files_exist",
+    # youngest_input=youngest_input.path, oldest_output=oldest_output.path,
+    # skipping=skipping)
     return skipping
+
 
 def get_directly_passed(func, args, kwargs):
     """Matches up *args and **kwargs to the variable names that the function expects.
@@ -356,6 +391,7 @@ def get_directly_passed(func, args, kwargs):
     # Throw in all of kwargs so that we still error out if someone gives us extra kwargs.
     name_to_posarg.update(kwargs)
     return name_to_posarg
+
 
 def magictask(*args, **kwargs):
     """
@@ -388,7 +424,9 @@ def magictask(*args, **kwargs):
     """
     # Shamelessly stolen from `invoke.task` :)
     klass = kwargs.pop("klass", Task)
-    get_params_args = {arg: kwargs.pop(arg, None) for arg in ('path', 'derive_kwargs')}
+    get_params_args = {
+        arg: kwargs.pop(arg, None) for arg in ("path", "derive_kwargs")
+    }
     # @task -- no options were (probably) given.
     if len(args) == 1 and callable(args[0]) and not isinstance(args[0], Task):
         return klass(get_params_from_ctx(skippable(args[0])), **kwargs)
@@ -400,4 +438,5 @@ def magictask(*args, **kwargs):
             **kwargs
         )
         return obj
+
     return inner

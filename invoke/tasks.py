@@ -172,8 +172,9 @@ class Task(object):
 
         # Pass along the name of varargs and kwargs.
         # Spec.varkw used to be spec.keywords, that might have been for py2.
-        special = namedtuple('SpecialArgSpec', ['varargs', 'kwargs'])(
-            spec.varargs, spec.varkw)
+        special = namedtuple("SpecialArgSpec", ["varargs", "kwargs"])(
+            spec.varargs, spec.varkw
+        )
 
         return arg_names, spec_dict, special
 
@@ -230,9 +231,13 @@ class Task(object):
                 opts["kind"] = kind
             opts["default"] = default
         # Help
-        help_name_key = (name if name in self.help
-                         else opts["attr_name"] if 'attr_name' in opts
-                         else None)
+        help_name_key = (
+            name
+            if name in self.help
+            else opts["attr_name"]
+            if "attr_name" in opts
+            else None
+        )
         if help_name_key in self.help:
             opts["help"] = self.help.pop(help_name_key)
         return opts
@@ -277,7 +282,9 @@ class Task(object):
         if self.help:
             raise ValueError(
                 "Help field was set for params that didn't exist: {}".format(
-                    list(self.help.keys())))
+                    list(self.help.keys())
+                )
+            )
         return args, vararg
 
 
@@ -367,7 +374,9 @@ class Call(object):
     .. versionadded:: 1.0
     """
 
-    def __init__(self, task, called_as=None, args=None, varargs=None, kwargs=None):
+    def __init__(
+        self, task, called_as=None, args=None, varargs=None, kwargs=None
+    ):
         """
         Create a new `.Call` object.
 

@@ -777,7 +777,9 @@ class Config(DataProxy):
 
         .. versionadded:: 1.0
         """
-        self._load_file(prefix="runtime", absolute=True, merge=merge, safe=True)
+        self._load_file(
+            prefix="runtime", absolute=True, merge=merge, safe=True
+        )
 
     def load_shell_env(self):
         """
@@ -887,8 +889,9 @@ class Config(DataProxy):
                 )
             # Make sure file exists without hiding bad suffix exception.
             if not exception and safe and not os.path.exists(filepath):
-                    exception = ValueError(
-                        "Could not find config file {}".format(filepath))
+                exception = ValueError(
+                    "Could not find config file {}".format(filepath)
+                )
             if exception:
                 raise exception
 
