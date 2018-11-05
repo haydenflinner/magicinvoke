@@ -1,5 +1,0 @@
-============
-``watchers``
-============
-
-.. automodule:: invoke.watchers
