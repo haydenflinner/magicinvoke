@@ -22,6 +22,7 @@ try:
     from .vendor.lexicon import Lexicon  # noqa
     from .vendor import six
     from .vendor.six.moves import reduce  # noqa
+    from .vendor.decorator import getfullargspec
 
     if six.PY3:
         from .vendor import yaml3 as yaml  # noqa

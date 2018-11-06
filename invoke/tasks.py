@@ -8,7 +8,7 @@ from copy import deepcopy
 import inspect
 import types
 
-from .util import six
+from .util import six, getfullargspec
 
 if six.PY3:
     from itertools import zip_longest
@@ -156,7 +156,7 @@ class Task(object):
         # TODO: __call__ exhibits the 'self' arg; do we manually nix 1st result
         # in argspec, or is there a way to get the "really callable" spec?
         func = body if isinstance(body, types.FunctionType) else body.__call__
-        spec = inspect.getfullargspec(func)
+        spec = getfullargspec(func)
         arg_names = spec.args[:]
 
         # Collect into for regular args
