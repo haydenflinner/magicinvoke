@@ -397,7 +397,19 @@ class ParseMachine(StateMachine):
             if not self.context.eat_all:
                 # TODO 378 other possibilities?
                 raise ParseError("Received unknown flag")
+
+            if self.context.eat_all and flag.startswith('--') and len(flag) == 3:
+                # --x to -x
+                # This is an awful hack but ultimately harmless?
+                # Otherwise we get a very strange key-error from the Lexicon,
+                # whatever a Lexicon is...
+                # TODO We don't handle the invocation
+                # invoke funcname --x val1 -x val2 reasonably at all...
+                # But only an edgecase if you try to pass --x and -x at once,
+                # and that can only happen with single letter param name, so screw it.
+                flag = '-' + flag[2]
             self.context.add_arg(Argument(name=flag.lstrip("-")))
+
         self.flag = self.context.flags[flag]
         debug("Moving to flag {!r}".format(self.flag))
         # Bookkeeping for iterable-type flags (where the typical 'value

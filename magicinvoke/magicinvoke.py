@@ -2,6 +2,11 @@ import collections
 from functools import partial
 import itertools
 
+try:
+    from pathlib import Path  # Py3
+except:
+    from pathlib2 import Path  # Py2
+
 from invoke import task, Collection
 from invoke.tasks import Task
 from invoke.vendor.decorator import (
@@ -10,11 +15,6 @@ from invoke.vendor.decorator import (
     FunctionMaker,
     decorate,
 )
-
-try:
-    from pathlib import Path  # Py3
-except:
-    from pathlib2 import Path  # Py2
 
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
@@ -315,10 +315,9 @@ def skippable(func, *args, **kwargs):
 
     def tester(type_annotation, words_to_match, argname, runtime_value):
         # Runtime_value could be either a string, or a list of strings!
-        annot = from_list(argspec.annotations.get(argname))[0]
+        annot = from_list(getattr(argspec, 'annotations', {}).get(argname))[0]
         return (
-            annot
-            and annot is type_annotation
+            annot and annot is type_annotation
             or any(w in argname.lower() for w in words_to_match)
         )
 

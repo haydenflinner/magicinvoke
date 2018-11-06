@@ -27,6 +27,8 @@ on GitHub for {}.
     version, text
 )
 
+# Require instead of vendor cause it has a transitive dependency
+deps = ["pathlib2"] if sys.version_info[0] == 2 else []
 
 setup(
     name="magicinvoke",
@@ -69,4 +71,5 @@ setup(
         "Topic :: System :: Software Distribution",
         "Topic :: System :: Systems Administration",
     ],
+    install_requires=deps,
 )
