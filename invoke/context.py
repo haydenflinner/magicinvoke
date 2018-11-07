@@ -364,7 +364,8 @@ class Context(DataProxy):
 
         .. versionadded:: 1.0
         """
-        self.command_cwds.append(path)
+        # cast to str to avoid cryptic error (#583)
+        self.command_cwds.append(str(path))
         yield
         self.command_cwds.pop()
 
