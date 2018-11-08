@@ -13,7 +13,7 @@ html_theme_options = {
     "description": "(Pythonic task execution)++",
     "github_user": "haydenflinner",
     "github_repo": "magicinvoke",
-    "sidebar_width": "250px",  # +30px from default cause we gotta long name :D
+    "sidebar_width": "300px",  # +30px from default cause we gotta long name :D
     # "analytics_id": "UA-18486793-3",
     # "travis_button": True,
     # "codecov_button": True,

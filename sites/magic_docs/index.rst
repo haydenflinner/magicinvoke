@@ -26,7 +26,8 @@ adds support for lots of goodies:
     `from this issue
     <https://github.com/pyinvoke/invoke/issues/461>`_
 
-* Bugfixes:
+* **Bugfixes**
+
   * Fix cryptic error when doing ``ctx.cd(pathlib.Path)`` (#454)
     
   * Fix help documentation for mis-spelled variable names silently being ignored (#409)
@@ -37,7 +38,7 @@ adds support for lots of goodies:
 
   * Fix cryptic error when task passed ``pre=func`` instead of ``pre=[func]``
 
-  * Fix cryptic error when ``@task('func')`` instead of ``@task(func)``
+  * Fix cryptic error when ``@task('func')`` instead of ``@task(func)`` (#598)
 
 
 Jump In
@@ -45,6 +46,8 @@ Jump In
 **Beginner's Note** 
 `Invoke's documentation <http://pyinvoke.org>`_ is the best place to start,
 as the majority of using this library is just like using regular ``invoke``.
+However, you should still install ``pip install magicinvoke`` to get the
+improved error messages while you learn.
 
 .. toctree::
     :maxdepth: 2
@@ -77,6 +80,6 @@ to write enough tests to get into the real ``invoke`` library!
 
 If you enjoy them (but not too often), you should also thank Anton Backer for
 the very handy
-``colored-traceback``.
+``colored-traceback``, which will be automatically activated if installed.
 
 
