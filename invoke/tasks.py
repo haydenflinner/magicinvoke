@@ -86,9 +86,30 @@ class Task(object):
         self.pre = pre or []
         self.skip_ifs = skip_ifs or []
         self.post = post or []
+        self.__should_be_task_list(self.pre, 'pre')
+        self.__should_be_task_list(self.skip_ifs, 'skip_ifs')
+        self.__should_be_task_list(self.post, 'post')
+
         self.times_called = 0
         # Whether to print return value post-execution
         self.autoprint = autoprint
+
+
+    def __should_be_task_list(self, l, l_name):
+        # Is it a list?
+        if not hasattr(l, "__iter__"):
+            err = ("Expected iterable! Did you do {l}=mytask instead of {l}=[mytask]?"
+            .format(l=l_name))
+            raise ValueError(err)
+        # Is each item in the list a task?
+        for task in l:
+            if not hasattr(task, 'pre'):
+                err = ("'{s}' has no attr pre!\nDid you mean "
+                "@task({s}) instead of @task('{s}')?"
+                "Are you sure {s} is an invoke.task?"
+                .format(s=task))
+                raise ValueError(err)
+
 
     @property
     def name(self):
@@ -127,6 +148,9 @@ class Task(object):
         if not isinstance(args[0], Context):
             err = "Task expected a Context as its first arg, got {} instead!"
             # TODO: raise a custom subclass _of_ TypeError instead
+            # This can mean you gave @pre(func_that_is_not_task).
+            # I don't think this is common enough to warrant putting in the
+            # error msg.
             raise TypeError(err.format(type(args[0])))
         result = self.body(*args, **kwargs)
         self.times_called += 1

@@ -230,12 +230,6 @@ class Executor(object):
         .. versionadded:: 1.0
         """
         ret = []
-        if not getattr(calls, "__iter__", False):
-            raise ValueError(
-                "Expected iterable! Did you do "
-                "pre=mytask instead of pre=[mytask]?"
-            )
-
         for call in calls:
             # Normalize to Call (this method is sometimes called with pre/post
             # task lists, which may contain 'raw' Task objects)

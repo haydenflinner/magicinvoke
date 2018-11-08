@@ -5,7 +5,7 @@ Welcome to MagicInvoke!
 **MagicInvoke** is an `invoke <http://pyinvoke.org>`_ extension that
 adds support for lots of goodies:
 
-* ``*args`` *and* ``**kwargs`` support!
+* ``*args`` **and** ``**kwargs`` **support!**
   See how easy it is here: :ref:`args-kwargs`. 
 
 * **Make-like file dependency recognition and work-avoidance!**
@@ -25,6 +25,19 @@ adds support for lots of goodies:
     Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
     `from this issue
     <https://github.com/pyinvoke/invoke/issues/461>`_
+
+* Bugfixes:
+  * Fix cryptic error when doing ``ctx.cd(pathlib.Path)`` (#454)
+    
+  * Fix help documentation for mis-spelled variable names silently being ignored (#409)
+
+  * Fix help documentation with - instead of _ being silently being ignored (#398)
+
+  * Fix silently ignoring config file path  (#560)
+
+  * Fix cryptic error when task passed ``pre=func`` instead of ``pre=[func]``
+
+  * Fix cryptic error when ``@task('func')`` instead of ``@task(func)``
 
 
 Jump In

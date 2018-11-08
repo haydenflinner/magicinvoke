@@ -200,12 +200,12 @@ class ParseMachine(StateMachine):
     def __init__(self, initial, contexts, ignore_unknown):
         # Initialize
         self.ignore_unknown = ignore_unknown
-        self.initial = self.context = initial
+        self.initial = self.context = copy.deepcopy(initial)
         debug("Initialized with context: {!r}".format(self.context))
         self.flag = None
         self.flag_got_value = False
         self.result = ParseResult()
-        self.contexts = contexts
+        self.contexts = copy.deepcopy(contexts)
         debug("Available contexts: {!r}".format(self.contexts))
         # In case StateMachine does anything in __init__
         super(ParseMachine, self).__init__()

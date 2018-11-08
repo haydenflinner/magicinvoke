@@ -103,7 +103,7 @@ class Context_:
             def mytask(c, underscored_option=True):
                 pass
 
-            self.c.add_arg(mytask.get_arguments()[0])
+            self.c.add_arg(mytask.get_arguments()[0][0])
             flags = self.c.inverse_flags["--no-underscored-option"]
             assert flags == "--underscored-option"
 

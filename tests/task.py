@@ -60,7 +60,8 @@ class task_:
         skip()
 
     def sets_which_args_are_optional(self):
-        assert self.vanilla["optional_values"].optional == ("myopt",)
+        vals = self.vanilla["optional_values"].optional
+        assert vals[0] == "myopt" and len(vals) == 1
 
     def allows_annotating_args_as_positional(self):
         assert self.vanilla["one_positional"].positional == ["pos"]
@@ -257,7 +258,7 @@ class Task_:
                 pass
 
             self.task = mytask
-            self.args = self.task.get_arguments()
+            self.args = self.task.get_arguments()[0]
             self.argdict = self._arglist_to_dict(self.args)
 
         def _arglist_to_dict(self, arglist):
@@ -269,7 +270,7 @@ class Task_:
             return ret
 
         def _task_to_dict(self, task):
-            return self._arglist_to_dict(task.get_arguments())
+            return self._arglist_to_dict(task.get_arguments()[0])
 
         def positional_args_come_first(self):
             assert self.args[0].name == "arg_3"
@@ -292,7 +293,7 @@ class Task_:
             def mytask(c, myarg=False):
                 pass
 
-            arg = mytask.get_arguments()[0]
+            arg = mytask.get_arguments()[0][0]
             assert arg.kind is str  # not bool!
 
         def optional_plus_nonbool_default_does_not_override_kind(self):
@@ -300,7 +301,7 @@ class Task_:
             def mytask(c, myarg=17):
                 pass
 
-            arg = mytask.get_arguments()[0]
+            arg = mytask.get_arguments()[0][0]
             assert arg.kind is int  # not str!
 
         def turns_function_signature_into_Arguments(self):
@@ -358,14 +359,14 @@ class Task_:
             def mytask(c):
                 pass
 
-            assert len(mytask.get_arguments()) == 0
+            assert len(mytask.get_arguments()[0]) == 0
 
         def underscores_become_dashes(self):
             @task
             def mytask(c, longer_arg):
                 pass
 
-            arg = mytask.get_arguments()[0]
+            arg = mytask.get_arguments()[0][0]
             assert arg.names == ("longer-arg", "l")
             assert arg.attr_name == "longer_arg"
             assert arg.name == "longer_arg"
