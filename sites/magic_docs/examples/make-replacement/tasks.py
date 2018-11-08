@@ -72,6 +72,7 @@ def clean(ctx, cfiles, objectfiles, executable_path, dry_run=False):
 # we have to import structlog for this test to work.
 import structlog
 
+
 @magictask
 def test(ctx):
     # Whole pipeline should run when c sources change.

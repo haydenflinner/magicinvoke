@@ -315,9 +315,10 @@ def skippable(func, *args, **kwargs):
 
     def tester(type_annotation, words_to_match, argname, runtime_value):
         # Runtime_value could be either a string, or a list of strings!
-        annot = from_list(getattr(argspec, 'annotations', {}).get(argname))[0]
+        annot = from_list(getattr(argspec, "annotations", {}).get(argname))[0]
         return (
-            annot and annot is type_annotation
+            annot
+            and annot is type_annotation
             or any(w in argname.lower() for w in words_to_match)
         )
 
