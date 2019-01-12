@@ -39,7 +39,7 @@ setup(
     long_description=long_description,
     author="Hayden Flinner",
     author_email="haydenflinner@gmail.com",
-    url="http://docs.pyinvoke.org",  # TODO github pages host our addendum
+    url="https://magicinvoke.readthedocs.io/en/latest/",
     packages=find_packages(exclude=exclude),
     include_package_data=True,
     entry_points={
