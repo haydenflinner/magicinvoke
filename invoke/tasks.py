@@ -5,7 +5,6 @@ generate new tasks.
 
 from collections import namedtuple
 from copy import deepcopy
-import inspect
 import types
 
 from .util import six, getfullargspec

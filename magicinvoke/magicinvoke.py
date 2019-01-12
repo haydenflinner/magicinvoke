@@ -9,16 +9,10 @@ try:
 except:
     from funcsigs import signature
     from pathlib2 import Path  # Py2
-    from future_builtins import filter
 
-from invoke import task, Collection
+from invoke import task  # noqa
 from invoke.tasks import Task
-from invoke.vendor.decorator import (
-    decorator,
-    getfullargspec,
-    FunctionMaker,
-    decorate,
-)
+from invoke.vendor.decorator import decorator, getfullargspec
 
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
@@ -153,17 +147,20 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             get_params_from_ctx, derive_kwargs=derive_kwargs, path=path
         )
 
-    if path and path.endswith('.'):
-        raise ValueError("Path can't end in .! Try 'ctx' instead of 'ctx.', if you want the global namespace.")
+    if path and path.endswith("."):
+        raise ValueError(
+            "Path can't end in .! Try 'ctx' instead of 'ctx.', if you want the global namespace."
+        )
 
-
-    """
-    Create a decorated function with the same argument list,
-    but with almost every parameter optional. Then, look for actually required
-    params in ctx.
-    """
     @functools.wraps(func)
     def customized_default_decorator(*args, **kwargs):
+        """
+        Creates a decorated function with the same argument list,
+        but with almost every parameter optional. When called,
+        looks for actually required params in ctx. Finally, calls
+        original function.
+        """
+
         # TODO re-write most of stuff that uses get_directly_passed
         # with funcsigs
         directly_passed = get_directly_passed(func, args, kwargs)
@@ -197,10 +194,12 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             return result_cache.get(param_name, fell_through)
 
         def traverse_path(param_name):
-            if path == None:
+            if path is None:
                 # TODO Maybe have access to namespaced name by now?
-                return ctx.config.get(func.__name__, {}).get(param_name, fell_through)
-            seq = path.split('.')
+                return ctx.config.get(func.__name__, {}).get(
+                    param_name, fell_through
+                )
+            seq = path.split(".")
             looking_in = ctx.config
             seq.pop(0)
             while seq:
@@ -213,6 +212,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             for param_name, param in signature(func).parameters.items()
             if param.default is not param.empty and callable(param.default)
         }
+
         def call_callable(param_name):
             if param_name in param_name_to_callable:
                 return param_name_to_callable[param_name](ctx)
@@ -246,9 +246,12 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         return func(**args_passing)
 
     sig = signature(func)
-    myparams = [p.replace(default=None) if p.default is p.empty else p
-                for p in sig.parameters.values()]
-    myparams[0] = list(sig.parameters.values())[0]  # Don't provide default for ctx
+    myparams = [
+        p.replace(default=None) if p.default is p.empty else p
+        for p in sig.parameters.values()
+    ]
+    # Don't provide default for ctx
+    myparams[0] = list(sig.parameters.values())[0]
     mysig = sig.replace(parameters=myparams)
     generated_function = customized_default_decorator
     generated_function.__signature__ = mysig
@@ -352,8 +355,8 @@ def skippable(func, *args, **kwargs):
     input_filenames = list(
         filtered_args(partial(tester, InputPath, [InputPath, "path", "file"]))
     )
-    # Because we suck in anything that has 'path' or 'file' in the name as Inputs, we've probably matched
-    # with some output variables too. Let's just discard those.
+    # Because we take in anything that has 'path' or 'file' in the name as Inputs,
+    # we've probably matched with some output variables too. Let's just discard those.
     input_filenames = set(input_filenames) ^ set(output_filenames)
 
     # Gonna leave these here in case anyone wants to use them later :D

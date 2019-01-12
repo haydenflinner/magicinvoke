@@ -111,7 +111,7 @@ class DataProxy(object):
         # having a config key accidentally shadow a real attribute or method).
         try:
             return self._get(key)
-        except KeyError as e:
+        except KeyError:
             # Proxy most special vars to config for dict procotol.
             if key in self._proxies:
                 return getattr(self._config, key)
