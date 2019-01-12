@@ -1,11 +1,15 @@
 import collections
 from functools import partial
+import functools
 import itertools
 
 try:
     from pathlib import Path  # Py3
+    from inspect import signature
 except:
+    from funcsigs import signature
     from pathlib2 import Path  # Py2
+    from future_builtins import filter
 
 from invoke import task, Collection
 from invoke.tasks import Task
@@ -24,13 +28,13 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     :param str path:
         A path in the format ``'ctx.arbitraryname.unpackthistomyparams'``
         to use to find defaults for the function.
-        Default: ``'ctx.{}'.format(func.__name__)``
+        Default: ``'ctx.myfuncname'``
 
         You shouldn't need to pass this unless you rename your function and don't
         want to modify old configs, or if you'd like to pull the config for a lot
-        of tasks from the same place in a ctx.
+        of tasks from the same place in ctx.
 
-    :param bool derive_kwargs:
+    :param Callable derive_kwargs:
         Overkill. Is passed ``ctx`` as first arg, expected to
         return dict of the format ``{'argname': 'defaultvalueforparam'}``.
         Default: ``ctx.get(func.__name__)``.
@@ -77,7 +81,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         def myfuncname_task(ctx, requiredparam1=None, namedparam2=None)
             requiredparam1 = namedparam1 or ctx.myfuncname.namedparam1
             namedparam2 = namedparam2 or ctx.myfuncname.namedparam2
-            return myfuncname(ctx, requiredparam1, namedparam2)
+            myfuncname(ctx, requiredparam1, namedparam2)
 
     This solution decouples the core of your code from invoke, which
     could be seen as a plus. However, if we were going to write this much
@@ -97,7 +101,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         @task
         @get_params_from_ctx
         def myfuncname(ctx, requiredparam1, namedparam2='trulyoptional')
-            return print(requiredparam1, namedparam2)
+            print(requiredparam1, namedparam2)
 
         ns.configure({"myfuncname" : {"requiredparam1" : 392}})
 
@@ -114,7 +118,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
         passing = (directly_passed.get(param_name, None) # First, positionals and kwargs
                     or ctx.config.get(path or func.__name__, {}).get(param_name, None)
-                    or call_callback_or_throw(param_name)
+                    or call_derive_kwargs_or_throw(param_name)
                     or fell_through)
 
     **Advanced Usage** The source is relatively simple, but you can imagine
@@ -126,14 +130,21 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     arguments, if you'd like. This is equivalent to the default::
 
         @get_params_from_ctx(path='ctx.myfuncname')
-        def myfuncname(ctx, requiredparam1, namedparam2='trulyoptional')
-            return print(requiredparam1, namedparam2)
+        def myfuncname(ctx, requiredparam1, namedparam2='trulyoptional'):
+            print(requiredparam1, namedparam2)
 
     Note that you can add an arbitrary number of dots to this. That is:
-    'ctx.another_level.xyz.myfuncnameargs' is a valid value for ctx_defaults.
+    'ctx.another_level.xyz.myfuncnameargs' is a valid value for the path.
 
-    You can also provide a function, which is a last resort after we check
-    in ``ctx`` for your function's name.
+    Secret way: If your default is a callable (which doesn't mean anything
+    for most Invoke tasks), we will call it with ctx. That is:
+        @get_params_from_ctx(path='ctx.myfuncname')
+        def myfuncname(ctx, requiredparam1,
+            namedparam1=lambda ctx: ctx.othertask.controlflag):
+            print(requiredparam1, namedparam1)
+
+    You can also provide a function for derive_kwargs, which augments
+    the user passed kwargs.
 
     .. versionadded:: 0.1
     """
@@ -142,94 +153,107 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             get_params_from_ctx, derive_kwargs=derive_kwargs, path=path
         )
 
-    def create_decorator():
-        """
-        A decorator that wraps a function in a function with the same argument list,
-        but with every parameter optional. When called, this decorator tries to
-        find values for each parameter from `ctx.`
-        """
-        # Have to define the function we're before we can modify
-        # its signature ;)
-        def customized_default_decorator(*args, **kwargs):
-            # __call__ on Task will handle the error before us if ctx wasn't passed
-            directly_passed = get_directly_passed(func, args, kwargs)
-            ctx = directly_passed["ctx"]
+    if path and path.endswith('.'):
+        raise ValueError("Path can't end in .! Try 'ctx' instead of 'ctx.', if you want the global namespace.")
 
-            def call_callback_or_error(param_name):
-                err = None
-                result_cache = None
-                try:
-                    result_cache = derive_kwargs(ctx) if derive_kwargs else {}
-                except AttributeError as e:
-                    err = (
-                        "Failed to get parameter values from your derive_kwargs function!\n"
-                        "Exception encountered:\n{}".format(e.args[0])
-                    )
-                if err:
-                    raise AttributeError(err)
 
-                return result_cache.get(param_name, None)
+    """
+    Create a decorated function with the same argument list,
+    but with almost every parameter optional. Then, look for actually required
+    params in ctx.
+    """
+    @functools.wraps(func)
+    def customized_default_decorator(*args, **kwargs):
+        # TODO re-write most of stuff that uses get_directly_passed
+        # with funcsigs
+        directly_passed = get_directly_passed(func, args, kwargs)
 
-            def fell_through():  # Cheapest sentinel I can come up with
-                pass
+        # Task.__call__ will error before us if ctx wasn't passed
+        # If you error here, rename your first arg (c) or (ctx) :)
+        ctx = args[0]
 
-            args_passing = {}
-            expecting = getfullargspec(func).args
-            for param_name in expecting:
-                # Decide through cascading what to use as the value for each parameter
-                passing = (
-                    directly_passed.get(
-                        param_name, None
-                    )  # First, positionals and kwargs
-                    or ctx.config.get(path or func.__name__, {}).get(
-                        param_name, None
-                    )
-                    or call_callback_or_error(param_name)
-                    or fell_through
+        class fell_through:  # Cheapest sentinel I can come up with
+            pass
+
+        def try_directly_passed(param_name):
+            if param_name in directly_passed:
+                returning = directly_passed[param_name]
+                return returning
+            return fell_through
+
+        def call_derive_kwargs_or_error(param_name):
+            err = None
+            result_cache = None
+            try:
+                result_cache = derive_kwargs(ctx) if derive_kwargs else {}
+            except AttributeError as e:
+                err = (
+                    "Failed to get parameter values from your derive_kwargs function!\n"
+                    "Exception encountered:\n{}".format(e.args[0])
                 )
+            if err:
+                raise AttributeError(err)
+
+            return result_cache.get(param_name, fell_through)
+
+        def traverse_path(param_name):
+            if path == None:
+                # TODO Maybe have access to namespaced name by now?
+                return ctx.config.get(func.__name__, {}).get(param_name, fell_through)
+            seq = path.split('.')
+            looking_in = ctx.config
+            seq.pop(0)
+            while seq:
+                key = seq.pop(0)
+                looking_in = looking_in[key]
+            return looking_in.get(param_name, fell_through)
+
+        param_name_to_callable = {
+            param_name: param.default
+            for param_name, param in signature(func).parameters.items()
+            if param.default is not param.empty and callable(param.default)
+        }
+        def call_callable(param_name):
+            if param_name in param_name_to_callable:
+                return param_name_to_callable[param_name](ctx)
+            return fell_through
+
+        args_passing = {}
+        expecting = getfullargspec(func).args
+        for param_name in expecting:
+            # Decide through cascading what to use as the value for each parameter
+            possibilities = (
+                # First, positionals and kwargs
+                try_directly_passed,
+                # Then check ctx
+                traverse_path,
+                # ...
+                call_derive_kwargs_or_error,
+                call_callable,
+            )
+
+            passing = fell_through
+            for p in possibilities:
+                passing = p(param_name)
                 if passing != fell_through:
-                    args_passing[param_name] = passing
+                    break
 
-            # Now that we've generated a kwargs dict that is everything we know about how to call
-            # this function, call it!
-            return func(**args_passing)
+            if passing is not fell_through:
+                args_passing[param_name] = passing
 
-        # Basically, now that we've generated a decorator that will derive the right values for
-        # arguments to pass through to the task, we need to generate a function with the same signature
-        # as the originally wrapped task, but with different defaults. We wouldn't need to do this if
-        # we could modify the `defaults` section of the arguments to our decorated function (or even
-        # the original function before we decorate it) at runtime, but such is life.
-        params = getfullargspec(func)
-        defaults = params.defaults or ()  # replace None with ()
-        num_posargs = (
-            len(params.args) - len(defaults) - 1
-        )  # -1 -> don't provide default for ctx
+        # Now that we've generated a kwargs dict that is everything we know about how to call
+        # this function, call it!
+        return func(**args_passing)
 
-        # As far as I can tell from reading the decorator module's documentation, there is no
-        # way to generate a function with a runtime-decided header in Python in a similar way to
-        # how we manipulate everything else in Python. What we _can_ do, however, is `exec` a
-        # declaration :). That's what FunctionMaker does internally, which is why it takes this
-        # cryptic looking string as an argument. I copied this from the decorator internals with
-        # one modification.
-        evaldict = dict(_call_=customized_default_decorator, _func_=func)
-        generated_function = FunctionMaker.create(
-            func,
-            "return _call_(%(shortsignature)s)",
-            evaldict,
-            __wrapped__=func,
-            # Prepend to real function's defaults with Nones. We have to do this because invoke
-            # will make the user provide positional arguments, even if there's a good value in ctx.
-            # We zip with original defaults (instead of just all None) to get proper type-hinting
-            # for cmd-line help.
-            # TODO py3 - use defaults of same type as annotation for each param
-            # (since None defaults to string in invoke)
-            defaults=tuple(
-                itertools.chain(itertools.repeat(None, num_posargs), defaults)
-            ),
-        )
-        return generated_function
+    sig = signature(func)
+    myparams = [p.replace(default=None) if p.default is p.empty else p
+                for p in sig.parameters.values()]
+    myparams[0] = list(sig.parameters.values())[0]  # Don't provide default for ctx
+    mysig = sig.replace(parameters=myparams)
+    generated_function = customized_default_decorator
+    generated_function.__signature__ = mysig
 
-    return create_decorator()
+    return generated_function
 
 
 InputPath = "input"
