@@ -38,6 +38,9 @@ install:
   # default venv, so we gotta hardcode it.
   - "virtualenv alt_env --python=$([[ $TRAVIS_PYTHON_VERSION == 2* ]] && echo python3 || echo /usr/bin/python)"
   - alt_env/bin/pip install wheel
+  # Dirty hack because we need our invoke to be picked up. TODO remove this
+  # by subclassing executor / application maybe? Ew.
+  - pip uninstall invoke
 before_script:
   # Create 'sudouser' w/ sudo password & perms on Travis' homedir
   - inv travis.make-sudouser
@@ -52,10 +55,10 @@ script:
   # Doctests in websites OK? (Same caveat as above...)
   - "if [[ $TRAVIS_PYTHON_VERSION != 'pypy3' ]]; then inv www.doctest; fi"
   # Did we break setup.py?
-  - inv travis.test-installation --package=invoke --sanity="inv --list"
+  - inv travis.test-installation --package=magicinvoke --sanity="inv --list"
   # Test distribution builds, including some package_data based stuff
   # (completion script printing)
-  - "inv travis.test-packaging --package=invoke --sanity='inv --list && inv --print-completion-script zsh' --alt-python=alt_env/bin/python"
+  - "inv travis.test-packaging --package=magicinvoke --sanity='inv --list && inv --print-completion-script zsh' --alt-python=alt_env/bin/python"
 after_success:
   # Upload coverage data to codecov
   - codecov
