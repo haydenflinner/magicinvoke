@@ -185,6 +185,10 @@ class Executor(object):
                 varargs, kwargs = task.as_varargs_and_kwargs
             else:
                 name, kwargs = task
+            # TODO(hflinner) here, we should probably bind args, varargs, kwargs
+            # all into one thing and give that to Call. It's our mess to sort out; not Call's __call__. Or maybe just inside Call.__init__. But def not __call__.
+            # Either way, this is the source of the bug where you can't have
+            # a positional arg before *args and **kwargs.
             c = Call(
                 task=self.collection[name],
                 varargs=varargs,

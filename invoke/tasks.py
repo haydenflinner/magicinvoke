@@ -434,11 +434,12 @@ class Call(object):
         aka = ""
         if self.called_as is not None and self.called_as != self.task.name:
             aka = " (called as: {!r})".format(self.called_as)
-        return "<{} {!r}{}, args: {!r}, kwargs: {!r}>".format(
+        return "<{} {!r}{}, args: {!r}, varargs: {!r}, kwargs: {!r}>".format(
             self.__class__.__name__,
             self.task.name,
             aka,
             self.args,
+            self.varargs,
             self.kwargs,
         )
 

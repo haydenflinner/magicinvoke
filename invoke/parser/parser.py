@@ -444,6 +444,7 @@ class ParseMachine(StateMachine):
         # Must have filled up positional_args
         if not self.context.eat_all:
             debug("Congrats, you found a parser bug! Please report!")
+        debug("Adding vararg {} to context {}".format(value, self.context))
         self.context.add_vararg(value)
 
     def error(self, msg):
