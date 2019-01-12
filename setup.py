@@ -29,6 +29,7 @@ on GitHub for {}.
 
 # Require instead of vendor cause it has a transitive dependency
 deps = ["pathlib2"] if sys.version_info[0] == 2 else []
+deps.append("colorama")
 
 setup(
     name="magicinvoke",

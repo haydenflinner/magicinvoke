@@ -306,7 +306,7 @@ class Runner_:
         def uses_ansi_bold(self):
             self._run("my command", echo=True)
             # TODO: vendor & use a color module
-            assert sys.stdout.getvalue() == "\x1b[1;37mmy command\x1b[0m\n"
+            assert sys.stdout.getvalue() == '\x1b[1mmy command\x1b[0m\n'
 
     class encoding:
         # NOTE: these tests just check what Runner.encoding ends up as; it's

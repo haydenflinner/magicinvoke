@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from colorama import Style
 import locale
 import os
 import struct
@@ -280,7 +281,10 @@ class Runner(object):
         env = self.generate_env(opts["env"], opts["replace_env"])
         # Echo running command
         if opts["echo"]:
-            print("\033[1;37m{}\033[0m".format(command))
+            # Bringing in colorama just to stop this from messing up
+            # terminal output + not output color if being redirected
+            # is extreme, but it works.
+            print("{}{}{}".format(Style.BRIGHT, command, Style.RESET_ALL))
         # Start executing the actual command (runs in background)
         self.start(command, shell, env)
         # Arrive at final encoding if neither config nor kwargs had one

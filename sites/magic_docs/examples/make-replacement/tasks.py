@@ -67,12 +67,6 @@ def clean(ctx, cfiles, objectfiles, executable_path, dry_run=False):
     ctx.run("rm {}".format(removing), warn=True)
 
 
-# It's awful, but since the output changes when you import structlog,
-# and I wrote these 'tests' assuming no color (i.e. raw string matching)
-# we have to import structlog for this test to work.
-import structlog
-
-
 @magictask
 def test(ctx):
     # Whole pipeline should run when c sources change.

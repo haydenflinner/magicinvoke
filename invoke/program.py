@@ -1,5 +1,6 @@
 from __future__ import unicode_literals, print_function
 
+import colorama
 import getpass
 import inspect
 import json
@@ -337,6 +338,7 @@ class Program(object):
 
         .. versionadded:: 1.0
         """
+        colorama.init()
         try:
             # Create an initial config, which will hold defaults & values from
             # most config file locations (all but runtime.) Used to inform
