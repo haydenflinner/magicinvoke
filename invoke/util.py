@@ -26,8 +26,10 @@ try:
 
     if six.PY3:
         from .vendor import yaml3 as yaml  # noqa
+        from inspect import signature  # noqa
     else:
         from .vendor import yaml2 as yaml  # noqa
+        from funcsigs import signature  # noqa
 except ImportError:
     from lexicon import Lexicon  # noqa
     import six

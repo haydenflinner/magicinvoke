@@ -415,7 +415,10 @@ class Call_:
 
         def includes_task_name(self):
             call = Call(self.task)
-            assert str(call) == "<Call 'mytask', args: (), kwargs: {}>"
+            assert (
+                str(call)
+                == "<Call 'mytask', args: (), varargs: (), kwargs: {}>"
+            )
 
         def works_for_subclasses(self):
             class MyCall(Call):
@@ -431,17 +434,20 @@ class Call_:
                 # Single-key dict to avoid dict ordering issues
                 kwargs={"kwarg1": "val1"},
             )
-            expected = "<Call 'mytask', args: ('posarg1', 'posarg2'), kwargs: {'kwarg1': 'val1'}>"  # noqa
+            expected = "<Call 'mytask', args: ('posarg1', 'posarg2'), varargs: (), kwargs: {'kwarg1': 'val1'}>"  # noqa
             assert str(call) == expected
 
         def includes_aka_if_explicit_name_given(self):
             call = Call(self.task, called_as="notmytask")
-            expected = "<Call 'mytask' (called as: 'notmytask'), args: (), kwargs: {}>"  # noqa
+            expected = "<Call 'mytask' (called as: 'notmytask'), args: (), varargs: (), kwargs: {}>"  # noqa
             assert str(call) == expected
 
         def skips_aka_if_explicit_name_same_as_task_name(self):
             call = Call(self.task, called_as="mytask")
-            assert str(call) == "<Call 'mytask', args: (), kwargs: {}>"
+            assert (
+                str(call)
+                == "<Call 'mytask', args: (), varargs: (), kwargs: {}>"
+            )
 
     class make_context:
         def requires_config_argument(self):
