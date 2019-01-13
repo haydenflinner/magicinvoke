@@ -7,12 +7,7 @@ from collections import namedtuple
 from copy import deepcopy
 import types
 
-from .util import signature, six, getfullargspec
-
-if six.PY3:
-    from itertools import zip_longest
-else:
-    from itertools import izip_longest as zip_longest
+from .util import signature, six
 
 from .context import Context
 from .parser import Argument, translate_underscores
