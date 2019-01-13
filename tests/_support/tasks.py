@@ -6,6 +6,7 @@ from magicinvoke import magictask
 def foo(c):
     print("Hm")
 
+
 @magictask
 def mfoo(c):
     print("Hm")

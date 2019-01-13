@@ -187,16 +187,15 @@ class DataProxy(object):
             root = getattr(self, "_root", self)
             value = DataProxy.from_data(data=value, root=root, keypath=keypath)
 
-
         if callable(value) and (
-                isinstance(value, Lazy)
-                or
-                # Stupid isinstance needed to let Mocks pass through unscathed :(
-                isinstance(value, type(lambda: None))
+            isinstance(value, Lazy)
+            or
+            # Stupid isinstance needed to let Mocks pass through unscathed :(
+            isinstance(value, type(lambda: None))
         ):
             # Try binding first, then actually call it.
             try:
-                sig = signature(value).bind(value)
+                signature(value).bind(value)
             except TypeError:
                 # User has a callable in ctx that isn't cooperating. Should we let them do that?
                 # For now, we'll raise and wait for someone to complain about the behavior.
@@ -1337,9 +1336,11 @@ class Lazy(object):
             ctx.mylazyparam = lambda ctx: ctx.x
         """
         if not path:
-            raise ValueError('path can not be None or empty.')
+            raise ValueError("path can not be None or empty.")
         # Bug here if we replace something later in the path (not beginning) but oh well.
-        path = path.replace('ctx.', 'c.')  # Allow both c. and ctx., but nothing else.
+        path = path.replace(
+            "ctx.", "c."
+        )  # Allow both c. and ctx., but nothing else.
         self.path = path
 
     def __call__(self, c):

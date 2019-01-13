@@ -297,7 +297,7 @@ class Program_:
         def callable_defaults_work(self):
             expect(
                 "-D x.y.z=21 -c integration callable-defaults",
-                out="21\n5\n5\n"
+                out="21\n5\n5\n",
             )
 
         def can_change_collection_search_root(self):
@@ -661,7 +661,7 @@ Available tasks:
                     "print-foo",
                     "print-name",
                     "print-underscored-arg",
-                    "print-x-y-z"
+                    "print-x-y-z",
                 )
             )
             for flag in ("-l", "--list"):

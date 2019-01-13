@@ -11,7 +11,6 @@ import textwrap
 from .util import six
 
 from . import Collection, Config, Executor, FilesystemLoader
-from .config import merge_dicts
 from .completion.complete import complete, print_completion_script
 from .parser import Parser, ParserContext, Argument
 from .exceptions import UnexpectedExit, CollectionNotFound, ParseError, Exit
@@ -57,7 +56,10 @@ class Program(object):
                 names=("define", "D"),
                 kind=list,
                 optional=True,
-                help="Override something in the final config. That is, -D echo=True == ctx.echo=True",
+                help=(
+                    "Override something in the final config. "
+                    "That is, -D echo=True == ctx.echo=True"
+                ),
             ),
             Argument(
                 names=("debug", "d"),
@@ -333,7 +335,7 @@ class Program(object):
             # We could just bring in dotmap and then exec a .x.y.z assignment,
             # but that feels dirty
             working_dict = merging_dict
-            components = [c.replace('-', '_') for c in path.split(".")]
+            components = [c.replace("-", "_") for c in path.split(".")]
             for c in components[:-1]:
                 if c not in working_dict:
                     working_dict[c] = {}

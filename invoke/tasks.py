@@ -144,7 +144,7 @@ class Task(object):
             # TODO: raise a custom subclass _of_ TypeError instead
             raise TypeError(err.format(type(args[0])))
 
-        called_by_executor = kwargs.pop('_called_by_executor', False)
+        called_by_executor = kwargs.pop("_called_by_executor", False)
         run = self.before_call(args, kwargs, called_by_executor)
         if run:
             result = self.body(*args, **kwargs)
@@ -158,6 +158,7 @@ class Task(object):
             return True
 
         ctx = args[0]
+
         def call_task(t):
             return t(ctx)
             # return t(*args, **kwargs)

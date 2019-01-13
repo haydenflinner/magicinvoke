@@ -33,6 +33,7 @@ __all__ = [
     "get_params_from_ctx",
     "skippable",
     "InputPath",
+    "Lazy",
     "OutputPath",
     "Skipped",
     "dotdict",

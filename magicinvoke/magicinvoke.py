@@ -13,7 +13,6 @@ except:
 from invoke import Collection, task, Lazy  # noqa
 from invoke.tasks import Task
 from invoke.vendor.decorator import decorator, getfullargspec
-from invoke.exceptions import ParseError
 
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
@@ -522,12 +521,7 @@ def magictask(*args, **kwargs):
     .. versionadded:: 0.1
     """
     # Shamelessly stolen from `invoke.task` :)
-    klass = kwargs.pop("klass", Task) # TODO replace Task with MagicTask -- whose __call__ knows if it's being called by executor. If not, run all pres.
-    # right now, pres only run from cmd-line, not if you __call__. that sucks.
-    # TODO document in README:
-    # can override config with -D now
-    # added decorator to namespaces (thank that one guy)
-    # Lazy
+    klass = kwargs.pop("klass", Task)
     collection = kwargs.pop("collection", None)
     get_params_args = {
         arg: kwargs.pop(arg, None) for arg in ("path", "derive_kwargs")
