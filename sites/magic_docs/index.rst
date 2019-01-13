@@ -9,7 +9,7 @@ adds support for lots of goodies:
   See how easy it is here: :ref:`args-kwargs`. 
 
 * **Make-like file dependency recognition and work-avoidance!**
-  :ref:`make-replacement`
+  :ref:`make-replacement` or :ref:`data-pipeline`.
   For more, check out :meth:`magicinvoke.skippable`. Very useful when
   you won't want something as cryptic or platform-specific as Make or bash,
   but you also don't want to go full CMake.

@@ -4,7 +4,7 @@ import os
 import types
 from os.path import join, splitext, expanduser
 
-from .util import six, yaml
+from .util import signature, six, yaml
 
 if six.PY3:
     try:
@@ -186,6 +186,26 @@ class DataProxy(object):
             # pass along our handle on the root.
             root = getattr(self, "_root", self)
             value = DataProxy.from_data(data=value, root=root, keypath=keypath)
+
+
+        if callable(value) and (
+                isinstance(value, Lazy)
+                or
+                # Stupid isinstance needed to let Mocks pass through unscathed :(
+                isinstance(value, type(lambda: None))
+        ):
+            # Try binding first, then actually call it.
+            try:
+                sig = signature(value).bind(value)
+            except TypeError:
+                # User has a callable in ctx that isn't cooperating. Should we let them do that?
+                # For now, we'll raise and wait for someone to complain about the behavior.
+                raise ValueError(
+                    "Can't have callable in ctx that can't be called with ctx to get value lazily."
+                    " Please come discuss if you'd prefer silently returning the callable."
+                )
+            value = value(self)
+
         return value
 
     def _set(self, *args, **kwargs):
@@ -1293,3 +1313,34 @@ def obliterate(base, deletions):
             obliterate(base[key], deletions[key])
         else:  # implicitly None
             del base[key]
+
+
+class Lazy(object):
+    def __init__(self, path):
+        """ An object that is lazily evaluated when pulled from ctx.
+        :param str path: String like "ctx.x.y.z" or "c.x.y.z" (no other prefixes allowed)
+
+        Imagine a ctx.config that looked like this::
+
+            ctx = {'x': 'y'}
+
+        Now do this::
+
+            ctx.mylazyparam = Lazy('ctx.x')
+
+        Every time ``ctx.mylazy`` is evaluated, it will actually return
+        the current value of ``ctx.x``
+
+        Note: You don't have to use the Lazy object if you don't want to, the following
+        works as well if you find it more clear::
+
+            ctx.mylazyparam = lambda ctx: ctx.x
+        """
+        if not path:
+            raise ValueError('path can not be None or empty.')
+        # Bug here if we replace something later in the path (not beginning) but oh well.
+        path = path.replace('ctx.', 'c.')  # Allow both c. and ctx., but nothing else.
+        self.path = path
+
+    def __call__(self, c):
+        return eval(self.path)

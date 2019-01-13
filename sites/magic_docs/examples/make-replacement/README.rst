@@ -3,10 +3,8 @@ File dependency resolution!
 =======================================
 .. _make-replacement:
 
-Try it!
+Dumb build system
 --------
-``pip install structlog`` 
-
 ``invoke write-all-the-programs run``
 
 You should end up with an executable under ``ws/`` that exits with code 255.

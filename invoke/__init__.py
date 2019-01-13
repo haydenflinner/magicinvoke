@@ -1,6 +1,6 @@
 from ._version import __version_info__, __version__  # noqa
 from .collection import Collection  # noqa
-from .config import Config  # noqa
+from .config import Config, Lazy  # noqa
 from .context import Context, MockContext  # noqa
 from .exceptions import (  # noqa
     AmbiguousEnvVar,

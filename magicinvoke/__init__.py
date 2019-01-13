@@ -10,6 +10,7 @@ from .magicinvoke import (
     get_params_from_ctx,
     skippable,
     InputPath,
+    Lazy,
     OutputPath,
     Skipped,
 )

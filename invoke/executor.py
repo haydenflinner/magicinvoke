@@ -134,7 +134,7 @@ class Executor(object):
                 # TODO 531 figure out why args is always blank here + how to
                 # space out *args past regular named args
                 args = (context,) + args + tuple(call.varargs)
-                result = call.task(*args, **call.kwargs)
+                result = call.task(*args, _called_by_executor=True, **call.kwargs)
                 if autoprint:
                     print(result)
                 # TODO: handle the non-dedupe case / the same-task-different-args

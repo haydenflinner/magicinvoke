@@ -289,6 +289,17 @@ class Program_:
         def handles_task_arguments(self):
             expect("-c integration print-name --name inigo", out="inigo\n")
 
+        def handles_ctx_overrides(self):
+            # TODO replace -D blah=blah with --blah blah by giving an *args
+            # and **kwargs param.
+            expect("-D x.y.z=21 -c integration print-x-y-z", out="21\n")
+
+        def callable_defaults_work(self):
+            expect(
+                "-D x.y.z=21 -c integration callable-defaults",
+                out="21\n5\n5\n"
+            )
+
         def can_change_collection_search_root(self):
             for flag in ("-r", "--search-root"):
                 expect(
@@ -468,8 +479,8 @@ Core options:
   --write-pyc                        Enable creation of .pyc files.
   -c STRING, --collection=STRING     Specify collection name to load.
   -d, --debug                        Enable debug output.
-  -D INT, --list-depth=INT           When listing tasks, only show the first
-                                     INT levels.
+  -D, --define                       Override something in the final config.
+                                     That is, -D echo=True == ctx.echo=True
   -e, --echo                         Echo executed commands before running.
   -f STRING, --config=STRING         Runtime configuration file to use.
   -F STRING, --list-format=STRING    Change the display format used when
@@ -478,6 +489,8 @@ Core options:
   -h [STRING], --help[=STRING]       Show core or per-task help and exit.
   -l [STRING], --list[=STRING]       List available tasks, optionally limited
                                      to a namespace.
+  -L INT, --list-depth=INT           When listing tasks, only show the first
+                                     INT levels.
   -p, --pty                          Use a pty when executing shell commands.
   -r STRING, --search-root=STRING    Change root directory used for finding
                                      task modules.
@@ -616,7 +629,7 @@ Options:
                 expect("-c decorators -h punch --list", out=expected)
 
             def complains_if_given_invalid_task_name(self):
-                expect("-h this", err="No idea what 'this' is!\n")
+                expect("-h this", err="No idea what 'this' is.\n")
 
     class task_list:
         "--list"
@@ -641,12 +654,14 @@ Available tasks:
                     "bar",
                     "biz",
                     "boz",
+                    "callable-defaults",
                     "foo",
                     "post1",
                     "post2",
                     "print-foo",
                     "print-name",
                     "print-underscored-arg",
+                    "print-x-y-z"
                 )
             )
             for flag in ("-l", "--list"):
@@ -880,7 +895,7 @@ Default 'build' task: .all
 Default task: test
 
 """
-                stdout, _ = run("-c tree --list --list-format=flat -D 1")
+                stdout, _ = run("-c tree --list --list-format=flat -L 1")
                 assert expected == stdout
 
             def depth_of_zero_is_same_as_max_depth(self):
@@ -907,7 +922,7 @@ Default task: test
 Default task: test
 
 """
-                stdout, _ = run("-c tree --list --list-format=flat -D 0")
+                stdout, _ = run("-c tree --list --list-format=flat -L 0")
                 assert expected == stdout
 
         class format:
@@ -1061,7 +1076,7 @@ Default task: test
 Default 'build' task: .all
 
 """
-                    stdout, _ = run("-c tree -l build -F nested -D1")
+                    stdout, _ = run("-c tree -l build -F nested -L1")
                     assert expected == stdout
 
                 # TODO: having these in each format smells like a POSSIBLY good
@@ -1098,12 +1113,12 @@ Default 'build' task: .all
                     assert expected == json.loads(stdout)
 
                 def does_not_honor_depth_arg(self):
-                    _, stderr = run("-c tree -l --list-format json -D 2")
+                    _, stderr = run("-c tree -l --list-format json -L 2")
                     expected = "The --list-depth option is not supported with JSON format!\n"  # noqa
                     assert expected == stderr
 
                 def does_not_honor_depth_arg_even_with_namespace(self):
-                    _, stderr = run("-c tree -l build -F json -D 2")
+                    _, stderr = run("-c tree -l build -F json -L 2")
                     expected = "The --list-depth option is not supported with JSON format!\n"  # noqa
                     assert expected == stderr
 

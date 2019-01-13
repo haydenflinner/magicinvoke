@@ -11,6 +11,7 @@ import textwrap
 from .util import six
 
 from . import Collection, Config, Executor, FilesystemLoader
+from .config import merge_dicts
 from .completion.complete import complete, print_completion_script
 from .parser import Parser, ParserContext, Argument
 from .exceptions import UnexpectedExit, CollectionNotFound, ParseError, Exit
@@ -51,6 +52,12 @@ class Program(object):
                 kind=str,
                 default="",
                 help="Print the tab-completion script for your preferred shell (bash|zsh|fish).",  # noqa
+            ),
+            Argument(
+                names=("define", "D"),
+                kind=list,
+                optional=True,
+                help="Override something in the final config. That is, -D echo=True == ctx.echo=True",
             ),
             Argument(
                 names=("debug", "d"),
@@ -95,7 +102,7 @@ class Program(object):
                 help="List available tasks, optionally limited to a namespace.",  # noqa
             ),
             Argument(
-                names=("list-depth", "D"),
+                names=("list-depth", "L"),
                 kind=int,
                 default=0,
                 help="When listing tasks, only show the first INT levels.",
@@ -317,6 +324,21 @@ class Program(object):
         self.config.load_runtime(merge=False)
         if merge:
             self.config.merge()
+        self.load_defines()
+
+    def load_defines(self):
+        merging_dict = self.config
+        for value in self.args.define.value:
+            path, value = value.split("=")
+            # We could just bring in dotmap and then exec a .x.y.z assignment,
+            # but that feels dirty
+            working_dict = merging_dict
+            components = [c.replace('-', '_') for c in path.split(".")]
+            for c in components[:-1]:
+                if c not in working_dict:
+                    working_dict[c] = {}
+                working_dict = working_dict[c]
+            working_dict[components[-1]] = value
 
     def run(self, argv=None, exit=True):
         """
@@ -477,8 +499,7 @@ class Program(object):
                 raise Exit
             else:
                 # TODO: feels real dumb to factor this out of Parser, but...we
-                # should?
-                raise ParseError("No idea what '{}' is!".format(halp))
+                raise ParseError("No idea what '{}' is.".format(halp))
 
         # Print discovered tasks if necessary
         list_root = self.args.list.value  # will be True or string

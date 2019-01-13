@@ -53,9 +53,10 @@ script:
   # Execute full test suite + coverage, as the new sudo-capable user
   - inv travis.sudo-coverage
   # Websites build OK? (Not on PyPy3, Sphinx is all "who the hell are you?" =/
-  - "if [[ $TRAVIS_PYTHON_VERSION != 'pypy3' ]]; then inv sites; fi"
+  - "if [[ $TRAVIS_PYTHON_VERSION != 'pypy3' ]]; then inv docs; fi"
   # Doctests in websites OK? (Same caveat as above...)
-  - "if [[ $TRAVIS_PYTHON_VERSION != 'pypy3' ]]; then inv www.doctest; fi"
+  # Skip the doctests; magicinvoke doesn't have any.
+  # - "if [[ $TRAVIS_PYTHON_VERSION != 'pypy3' ]]; then inv docs.doctest; fi"
   # Did we break setup.py?
   - inv travis.test-installation --package=magicinvoke --sanity="inv --list"
   # Test distribution builds, including some package_data based stuff

@@ -7,7 +7,7 @@ from collections import namedtuple
 from copy import deepcopy
 import types
 
-from .util import signature, six
+from .util import debug, signature, six
 
 from .context import Context
 from .parser import Argument, translate_underscores
@@ -142,13 +142,56 @@ class Task(object):
         if not isinstance(args[0], Context):
             err = "Task expected a Context as its first arg, got {} instead!"
             # TODO: raise a custom subclass _of_ TypeError instead
-            # This can mean you gave @pre(func_that_is_not_task).
-            # I don't think this is common enough to warrant putting in the
-            # error msg.
             raise TypeError(err.format(type(args[0])))
-        result = self.body(*args, **kwargs)
+
+        called_by_executor = kwargs.pop('_called_by_executor', False)
+        run = self.before_call(args, kwargs, called_by_executor)
+        if run:
+            result = self.body(*args, **kwargs)
         self.times_called += 1
+        self.after_call(args, kwargs, called_by_executor)
         return result
+
+    def before_call(self, args, kwargs, called_by_executor=False):
+        """Calls pres/skip_ifs/posts if not being called by Executor (i.e. as a Python function)"""
+        if called_by_executor:
+            return True
+
+        ctx = args[0]
+        def call_task(t):
+            return t(ctx)
+            # return t(*args, **kwargs)
+
+        for task in self.pre:
+            call_task(task)
+
+        skipped_because = None
+        for check_task in self.skip_ifs:
+            skip = call_task(check_task)
+            if skip:
+                skipped_because = skip
+                break
+
+        if skipped_because:
+            debug(
+                "Skipping {} because {} returned {}".format(
+                    self.name, check_task.name, skipped_because
+                )
+            )
+        else:
+            debug(
+                "All {} checks for {} passed".format(
+                    len(self.skip_ifs), self.name
+                )
+            )
+        return not skipped_because
+
+    def after_call(self, args, kwargs, called_by_executor=False):
+        if called_by_executor:
+            return True
+        ctx = args[0]
+        for task in self.post:
+            task(ctx)
 
     @property
     def called(self):

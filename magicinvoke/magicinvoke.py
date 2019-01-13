@@ -10,9 +10,10 @@ except:
     from funcsigs import signature
     from pathlib2 import Path  # Py2
 
-from invoke import task  # noqa
+from invoke import Collection, task, Lazy  # noqa
 from invoke.tasks import Task
 from invoke.vendor.decorator import decorator, getfullargspec
+from invoke.exceptions import ParseError
 
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
@@ -108,12 +109,19 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     * If no value was passed, and no default can be found, you will get a normal
       Python error.
 
-    The cascading order for finding an argument value is as follows::
+    The cascading order for finding an argument value is as follows:
 
-        passing = (directly_passed.get(param_name, None) # First, positionals and kwargs
-                    or ctx.config.get(path or func.__name__, {}).get(param_name, None)
-                    or call_derive_kwargs_or_throw(param_name)
-                    or fell_through)
+    * directly passed (i.e. task(ctx, 'arghere') or --arg arghere on cmd line
+
+    * config (ctx) (defaults to ctx.func.__name__)
+
+    * derive_kwargs your callable that you shouldn't ever need :)
+
+    * callable defaults - default parameter values that are callable are called
+      with callable(ctx) to get the value that should be used for a default.
+
+    * actual defaults - the regular defaults in the function header.
+
 
     **Advanced Usage** The source is relatively simple, but you can imagine
     it works like this:
@@ -131,7 +139,8 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     'ctx.another_level.xyz.myfuncnameargs' is a valid value for the path.
 
     Secret way: If your default is a callable (which doesn't mean anything
-    for most Invoke tasks), we will call it with ctx. That is:
+    for most Invoke tasks), we will call it with ctx. That is::
+
         @get_params_from_ctx(path='ctx.myfuncname')
         def myfuncname(ctx, requiredparam1,
             namedparam1=lambda ctx: ctx.othertask.controlflag):
@@ -152,6 +161,9 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             "Path can't end in .! Try 'ctx' instead of 'ctx.', if you want the global namespace."
         )
 
+    # Only up here to we can use it to generate ParseError when decorated func gets called.
+    sig = signature(func)
+
     @functools.wraps(func)
     def customized_default_decorator(*args, **kwargs):
         """
@@ -163,7 +175,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
         # TODO re-write most of stuff that uses get_directly_passed
         # with funcsigs
-        directly_passed = get_directly_passed(func, args, kwargs)
+        directly_passed = get_directly_passed(func, sig, args, kwargs)
 
         # Task.__call__ will error before us if ctx wasn't passed
         # If you error here, rename your first arg (c) or (ctx) :)
@@ -174,7 +186,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
         def try_directly_passed(param_name):
             if param_name in directly_passed:
-                returning = directly_passed[param_name]
+                returning = directly_passed.pop(param_name)
                 return returning
             return fell_through
 
@@ -241,11 +253,36 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             if passing is not fell_through:
                 args_passing[param_name] = passing
 
+        ba = sig.bind_partial(**args_passing)
+        # Apply defaults isn't there on funcsig version.
+        missing = []
+        for param in sig.parameters.values():
+            if param.name not in ba.arguments and param.default is param.empty:
+                missing.append(param.name)
+        if missing:
+            msg = "{!r} did not receive required positional arguments: {}".format(
+                func.__name__,
+                ", ".join(
+                    repr(p_name)
+                    for p_name, p in sig.parameters.items()[1:]
+                    if (
+                        p.kind is p.POSITIONAL_ONLY
+                        or p.kind is p.POSITIONAL_OR_KEYWORD
+                    )
+                    and p_name not in ba.arguments
+                ),
+            )
+            raise TypeError(msg)
+        if directly_passed:
+            msg = "{!r} received arguments it didn't recognize: {}".format(
+                func.__name__,
+                ", ".join(repr(p_name) for p_name in directly_passed.keys()),
+            )
+            raise TypeError(msg)
         # Now that we've generated a kwargs dict that is everything we know about how to call
         # this function, call it!
         return func(**args_passing)
 
-    sig = signature(func)
     myparams = [
         p.replace(default=None) if p.default is p.empty else p
         for p in sig.parameters.values()
@@ -255,6 +292,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     mysig = sig.replace(parameters=myparams)
     generated_function = customized_default_decorator
     generated_function.__signature__ = mysig
+    # print('sig here ', mysig.parameters)
 
     return generated_function
 
@@ -315,7 +353,7 @@ def skippable(func, *args, **kwargs):
     .. versionadded:: 0.1
     """
 
-    name_to_arg = get_directly_passed(func, args, kwargs)
+    name_to_arg = get_directly_passed(func, signature(func), args, kwargs)
     argspec = getfullargspec(func)
 
     def from_list(val):
@@ -404,7 +442,7 @@ def timestamp_differ(input_filenames, output_filenames):
     return skipping
 
 
-def get_directly_passed(func, args, kwargs):
+def get_directly_passed(func, sig, args, kwargs):
     """Matches up *args and **kwargs to the variable names that the function expects.
     >>>def mytest(ctx, required0, named0=None):
     >>>    pass
@@ -413,9 +451,43 @@ def get_directly_passed(func, args, kwargs):
 
     Don't call it on itself! Or do, I'm not the cops.
     """
+
+    try:
+        ba = sig.bind_partial(*args, **kwargs)
+    except TypeError as e:
+        if "too many" in e.args[0]:
+            msg = "{!r} accepts {} arguments but received {}".format(
+                func.__name__,
+                # -1 is for ctx
+                len(
+                    [
+                        p
+                        for p in sig.parameters.values()
+                        if p.kind is p.POSITIONAL_OR_KEYWORD
+                        or p.kind is p.POSITIONAL_ONLY
+                    ]
+                ),
+                # Note that this isn't strictly correct, but it's probably right most of the time.
+                len(args) + len(kwargs),
+            )
+            raise TypeError(msg)
+        raise
+
+    for param in sig.parameters.values():
+        if param.name not in ba.arguments:
+            ba.arguments[param.name] = param.default
+
     expecting = getfullargspec(func).args
     name_to_posarg = {name: arg for name, arg in zip(expecting, args)}
     # Throw in all of kwargs so that we still error out if someone gives us extra kwargs.
+    for k, v in kwargs.items():
+        if k not in expecting:
+            # Actually this is probably kwargs but oh well, it works
+            msg = "{!r} does not accept these arguments {}".format(
+                func.__name__, ", ".join(repr(k))
+            )
+            raise TypeError(msg)
+        name_to_posarg[k] = v
     name_to_posarg.update(kwargs)
     return name_to_posarg
 
@@ -450,13 +522,22 @@ def magictask(*args, **kwargs):
     .. versionadded:: 0.1
     """
     # Shamelessly stolen from `invoke.task` :)
-    klass = kwargs.pop("klass", Task)
+    klass = kwargs.pop("klass", Task) # TODO replace Task with MagicTask -- whose __call__ knows if it's being called by executor. If not, run all pres.
+    # right now, pres only run from cmd-line, not if you __call__. that sucks.
+    # TODO document in README:
+    # can override config with -D now
+    # added decorator to namespaces (thank that one guy)
+    # Lazy
+    collection = kwargs.pop("collection", None)
     get_params_args = {
         arg: kwargs.pop(arg, None) for arg in ("path", "derive_kwargs")
     }
     # @task -- no options were (probably) given.
     if len(args) == 1 and callable(args[0]) and not isinstance(args[0], Task):
-        return klass(get_params_from_ctx(skippable(args[0])), **kwargs)
+        t = klass(get_params_from_ctx(skippable(args[0])), **kwargs)
+        if collection is not None:
+            collection.add_task(t)
+        return t
     # @task(options)
     def inner(inner_obj):
         obj = klass(
@@ -464,6 +545,32 @@ def magictask(*args, **kwargs):
             # Pass in any remaining kwargs as-is.
             **kwargs
         )
+        if collection is not None:
+            collection.add_task(obj)
         return obj
 
     return inner
+
+
+def _ns_task(self, *args, **kwargs):
+    # @task -- no options were (probably) given.
+    if len(args) == 1 and callable(args[0]) and not isinstance(args[0], Task):
+        t = task(args[0])
+        self.add_task(t)
+        return t
+    # All other invocations are just task arguments, without the function to wrap:
+    def inner(f):
+        t = task(f, *args, **kwargs)
+        self.add_task(t)
+        return t
+
+    return inner
+
+
+def _ns_magictask(self, *args, **kwargs):
+    return magictask(*args, collection=self, **kwargs)
+
+
+# Monkeypatch Collection :)
+Collection.task = _ns_task
+Collection.magictask = _ns_magictask

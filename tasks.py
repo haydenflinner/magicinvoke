@@ -78,7 +78,6 @@ ns = Collection(
     integration,
     vendorize,
     release,
-    www,
     docs,
     sites,
     watch_docs,

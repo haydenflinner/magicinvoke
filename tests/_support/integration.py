@@ -5,6 +5,7 @@ If we're being honest, though, the new 'tree' fixture package is a lot bigger.
 """
 
 from invoke.tasks import task
+from magicinvoke import magictask, Lazy
 
 
 @task
@@ -16,6 +17,19 @@ def print_foo(c):
 def print_name(c, name):
     print(name)
 
+@magictask(path='ctx.x.y')
+def print_x_y_z(c, z):
+    # Tests both parameter expansion and used to test -D x.y.z syntax
+    print(z)
+
+@magictask
+def callable_defaults(ctx, z=lambda ctx: ctx.x.y.z):
+    # Tests both callable defaults and callables in ctx.
+    print(z)
+    ctx.x.y.z = lambda ctx: 5
+    print(ctx.x.y.z)
+    ctx.mylazy = Lazy('ctx.x.y.z')
+    print(ctx.mylazy)
 
 @task
 def print_underscored_arg(c, my_option):
