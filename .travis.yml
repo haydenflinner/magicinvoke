@@ -40,7 +40,9 @@ install:
   - alt_env/bin/pip install wheel
   # Dirty hack because we need our invoke to be picked up. TODO remove this
   # by subclassing executor / application maybe? Ew.
-  - pip uninstall invoke
+  - pip uninstall invoke -y
+  # This is an even dirtier hack because we want `inv` back.
+  - pip install -e .
 before_script:
   # Create 'sudouser' w/ sudo password & perms on Travis' homedir
   - inv travis.make-sudouser
