@@ -31,6 +31,7 @@ if os.getenv("MAGICINVOKE_DEBUG"):
 
 
 log = logging.getLogger("magicinvoke")
+debug = "dummy"  # noqa
 for x in ("debug",):
     globals()[x] = getattr(log, x)
 
@@ -300,7 +301,8 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             raise TypeError(msg)
         # Now that we've generated a kwargs dict that is everything we know about how to call
         # this function, call it!
-        # debug("Derived params {}".format({a: v for a, v in args_passing.items() if a != 'ctx' and a != 'c'}))
+        # debug("Derived params {}".format({a: v for a, v in args_passing.items()
+        # if a != 'ctx' and a != 'c'}))
         return func(**args_passing)
 
     myparams = [
