@@ -1,11 +1,11 @@
 =======================================
 File dependency resolution!
 =======================================
-.. _make-replacement:
+.. _data-pipeline:
 
-Dumb build system
------------------
-``invoke write-all-the-programs run``
+Try it!
+--------
+``invoke call-me -i people.txt -o results.txt``
 
 You should end up with an executable under ``ws/`` that exits with code 255.
 
@@ -17,11 +17,5 @@ That's because of :meth:`magicinvoke.get_params_from_ctx`, which was applied by
 :meth:`magicinvoke.magictask`.
 
 .. literalinclude:: tasks.py
-   :linenos:
-   :language: python
-
-**invoke.py**
-
-.. literalinclude:: invoke.py
    :linenos:
    :language: python

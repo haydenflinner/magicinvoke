@@ -1,36 +1,36 @@
 import itertools
 from textwrap import dedent
 
-from magicinvoke import magictask, get_params_from_ctx, InputPath, OutputPath
+from magicinvoke import (
+    magictask,
+    get_params_from_ctx,
+    InputPath,
+    OutputPath,
+    Lazy,
+)
 
 """Yes, I'm aware that this should not be used as a build tool :)"""
 
-# First, write a .c file with a ``main`` and some other ones to be 'libraries'.
-@magictask(derive_kwargs=lambda ctx: dict(executable_cfile=ctx.sources[0]))
-def write_all_the_programs(ctx, executable_cfile, cfiles):
+
+@magictask(path="ctx.mycompileinfo")
+def write_all_the_programs(
+    ctx, cfiles, executable_cfile=Lazy("ctx.mycompileinfo.cfiles[0]")
+):
+    """First, write a .c file with a ``main`` and some other ones to be 'libraries'."""
     ctx.run("echo 'int main(void){return 255;}' > " + str(executable_cfile))
     ctx.run("touch " + " ".join(str(x) for x in cfiles))
 
 
-# Then compile them
-@magictask
+@magictask(path="ctx.mycompileinfo")
 def mycompile(ctx, cfiles, objectfiles: [OutputPath]):
-    [
+    """Then compile them"""
+    for c, o in zip(cfiles, objectfiles):
         ctx.run("gcc -c {} -o {}".format(c, o))
-        for c, o, in zip(cfiles, objectfiles)
-    ]
 
 
-# This function re-uses our original compile, letting mycompile fall back to
-# defaults defined in ctx.
-@magictask
-def testmycompile(ctx):
-    return mycompile(ctx)
-
-
-# Now we link them into our final executable...
-@magictask(pre=[mycompile])
+@magictask(path="ctx.mycompileinfo", pre=[mycompile])
 def link(ctx, objectfiles: [InputPath], executable_path: OutputPath):
+    """Now we link them into our final executable..."""
     ctx.run(
         "gcc -o {} {}".format(
             executable_path, " ".join(str(f) for f in objectfiles)
@@ -38,37 +38,38 @@ def link(ctx, objectfiles: [InputPath], executable_path: OutputPath):
     )
 
 
-# And finally run the executable without warn=True, so we should exit with
-# an error code.
-@magictask(pre=[link])
+@magictask(path="ctx.mycompileinfo", pre=[link])
 def run(ctx, executable_path: InputPath):
-    # We could have also just called
-    # link(ctx) here, because of how @skippable is implemented it has no real
-    # dependency on invoke
+    """And finally run the executable, exiting with exitcode=255."""
+    # Calling link(ctx) here would would work just as well as pre=[link], but
+    #  rather than invoke checking if link needs to run _once_ when the application
+    #  starts,  for all tasks that depend on it (see task-deduping page),
+    #  we have to check if it needs to be run each time someone calls it.
+    #  Given that checking file timestamps is pretty fast, this probably isn't a big deal.
     ctx.run("{}".format(executable_path))
 
 
-# This task provided so that you can poke the files yourself and see that we
-# only run the tasks that are necessary :)
-@magictask
+@magictask("path=ctx.mycompileinfo")
 def touch(ctx, cfiles):
+    """
+    This task provided so that you can poke the files yourself and see that we
+    only run the tasks that are necessary :)
+    """
     for f in cfiles:
         ctx.run("touch {}".format(f))
 
 
-@magictask
-def clean(ctx, cfiles, objectfiles, executable_path, dry_run=False):
+@magictask(path="ctx.mycompileinfo")
+def clean(ctx, cfiles, objectfiles, executable_path):
     removing = " ".join(
         str(p) for p in itertools.chain(cfiles, objectfiles, [executable_path])
     )
-    if dry_run:
-        print(removing)
-        return
     ctx.run("rm {}".format(removing), warn=True)
 
 
 @magictask
 def test(ctx):
+    """Don't mind me; used by automated tests to ensure the example stays working!"""
     # Whole pipeline should run when c sources change.
     expected_stdout = dedent(
         """
@@ -77,9 +78,10 @@ def test(ctx):
         gcc -c ws/c.c -o ws/c.o
         gcc -o ws/produced_executable ws/a.o ws/b.o ws/c.o
         ws/produced_executable
-    """
+        """
     )
     # Note how we don't have to pass all the defaults in from ``ctx`` here :)
+    # The semantics of calling a task from Python now match the cmd-line semantics.
     clean(ctx)
     write_all_the_programs(ctx)
 
@@ -91,10 +93,10 @@ def test(ctx):
         """
         gcc -o ws/produced_executable ws/a.o ws/b.o ws/c.o
         ws/produced_executable
-    """
+        """
     )
-    ctx.run("touch {}".format(ctx.link.objectfiles[0]))
+    ctx.run("touch {}".format(ctx.mycompileinfo.objectfiles[0]))
     res = ctx.run("invoke run", warn=True)
     assert expected_stdout.strip() == res.stdout.strip()
 
-    print("All tests succeded.")
+    print("All tests succeeded.")

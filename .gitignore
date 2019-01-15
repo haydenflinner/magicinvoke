@@ -9,3 +9,6 @@ src/
 htmlcov
 coverage.xml
 .cache
+__pycache__/
+.mypy_cache/
+*.pyc

@@ -1,7 +1,10 @@
 import collections
+import os
 from functools import partial
 import functools
+import hashlib
 import itertools
+import logging
 
 try:
     from pathlib import Path  # Py3
@@ -10,9 +13,26 @@ except:
     from funcsigs import signature
     from pathlib2 import Path  # Py2
 
-from invoke import Collection, task, Lazy  # noqa
+from invoke import Collection, task, Lazy, run  # noqa
 from invoke.tasks import Task
 from invoke.vendor.decorator import decorator, getfullargspec
+
+from cachepath import CachePath
+
+
+def enable_logging(disable_invoke_logging=True):
+    logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
+    logging.getLogger("invoke").setLevel(logging.WARNING)
+
+
+LOG_FORMAT = "%(name)s.%(module)s.%(funcName)s: %(message)s"
+if os.getenv("MAGICINVOKE_DEBUG"):
+    enable_logging()
+
+
+log = logging.getLogger("magicinvoke")
+for x in ("debug",):
+    globals()[x] = getattr(log, x)
 
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
@@ -246,7 +266,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             passing = fell_through
             for p in possibilities:
                 passing = p(param_name)
-                if passing != fell_through:
+                if passing is not fell_through:
                     break
 
             if passing is not fell_through:
@@ -263,7 +283,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 func.__name__,
                 ", ".join(
                     repr(p_name)
-                    for p_name, p in sig.parameters.items()[1:]
+                    for p_name, p in list(sig.parameters.items())[1:]
                     if (
                         p.kind is p.POSITIONAL_ONLY
                         or p.kind is p.POSITIONAL_OR_KEYWORD
@@ -280,6 +300,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             raise TypeError(msg)
         # Now that we've generated a kwargs dict that is everything we know about how to call
         # this function, call it!
+        # debug("Derived params {}".format({a: v for a, v in args_passing.items() if a != 'ctx' and a != 'c'}))
         return func(**args_passing)
 
     myparams = [
@@ -299,6 +320,24 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 InputPath = "input"
 OutputPath = "output"
 Skipped = "Skipped because output files newer than all input files."
+
+
+def _hash(obj):
+    # Hope your __str__ doesn't include things that don't matter :)
+    import re
+
+    # TODO automated coverage of plain; it's the one I use so usually good,
+    # but doesn't hurt
+    if os.getenv("MAGICINVOKE_PLAINTEXT_ARGS"):
+        s = obj
+        s = str(s).strip().replace(" ", "_")
+        # TODO make sure:
+        # func name gets included in this that way colliding param lists don't
+        # cause issues
+        # and pretty this up, it's horrid. Make it
+        # func.__name arg1 arg2 arg3 --kv 1 --kv2 2
+        return re.sub(r"(?u)[^-\w.]", "-", s)
+    return hashlib.sha224(obj.encode("utf-8")).hexdigest()
 
 
 @decorator
@@ -349,81 +388,205 @@ def skippable(func, *args, **kwargs):
     4. ``@skippable(extra_deps=lambda ctx:
        ctx.buildconfig.important_executable_path)`` *TODO support this*
 
+    How it works: We use the timestamps of your input filenames and output
+    filenames in much the same way as make (i.e. just compare modified timestamp)
+    However, we also put a file in $TMPDIR that records the arguments given to
+    your function. That way, a function like this works as expected::
+
+        def get_output(input_path, output_path, flag_that_changes_output):
+            pass
+
+    By default, _all_ arguments that aren't filepaths are considered significant
+    (except first arg if named c/ctx i.e. invoke-style). However, you can mark an
+    argument as not-significant to the output by starting its name with an
+    underscore::
+
+        def get_output(input_path, output_path, _flag_that_doesnt_affect_output):
+            pass
+
     .. versionadded:: 0.1
     """
 
-    name_to_arg = get_directly_passed(func, signature(func), args, kwargs)
-    argspec = getfullargspec(func)
-
-    def from_list(val):
+    def to_list_if_not_already(val):
         """
-        >>>from_list('xyz')
-        ('xyz')
-        >>>from_list(['xyz'])
-        ('xyz')
+        >>>to_list_if_not_already('xyz')
+        ['xyz']
+        >>>to_list_if_not_already(['xyz'])
+        ['xyz']
         """
         if not (isinstance(val, list) or isinstance(val, tuple)):
             # I don't like checking types explicitly in python, but I can't think of a more
             # reliable way that wouldn't include strings in py2.
-            # Could try the *operator on each value
-            # to a dummy function, but that would behave funny with short / 0/1 length strings.
             return [val]
         else:
             return val
 
-    filtered_args = lambda tester: itertools.chain.from_iterable(
-        from_list(runtime_value)
-        for argname, runtime_value in name_to_arg.items()
-        if tester(argname, runtime_value)
-    )
-
-    def tester(type_annotation, words_to_match, argname, runtime_value):
-        # Runtime_value could be either a string, or a list of strings!
-        annot = from_list(getattr(argspec, "annotations", {}).get(argname))[0]
-        return (
-            annot
-            and annot is type_annotation
-            or any(w in argname.lower() for w in words_to_match)
+    """
+    Here's the plan:
+      Create two lists; one for filenames and one for arguments that don't start with _.
+      Pass the filenames through to the original content of this function;
+      Last_Ran with these parameters must be newer than input_filenames
+      Fresh last_ran per set of parameters. Database?
+    """
+    sig = signature(func)
+    # bind here to get the error..
+    ba = sig.bind(*args, **kwargs)
+    # Since we don't have getcallargs on Py2
+    for param in sig.parameters.values():
+        if param.name not in ba.arguments:
+            ba.arguments[param.name] = param.default
+    # Name ctx so that we can try to support regular functions, not just Tasks. Untested.
+    if len(ba.arguments.items()) == 0:
+        raise ValueError(
+            "This shouldn't be a skippable task, it has no in or out params or ctx."
         )
 
-    output_filenames = list(
-        filtered_args(partial(tester, OutputPath, [OutputPath]))
+    # This is where we hack popping out ctx if the function is a task. Could
+    # probably drop this; what are the odds someone uses @skippable on a
+    # regular function.
+    name_and_args = (
+        list(ba.arguments.items())[1:]
+        if list(ba.arguments.keys())[0] in ["c", "ctx"]
+        else ba.arguments.items()
     )
-    input_filenames = list(
-        filtered_args(partial(tester, InputPath, [InputPath, "path", "file"]))
+
+    params_that_are_filenames = []
+
+    def look_for_variables_with(type_annotation, words_to_match):
+        returning = []
+        for param_name, runtime_value in name_and_args:
+            # Assume whole list is of one type, that is List<type(list[0])>.
+            # Don't write more complex annotations than that, please :)
+            annotation = to_list_if_not_already(
+                sig.parameters[param_name].annotation
+            )[0]
+            if (
+                annotation
+                and annotation is type_annotation
+                or any(w in param_name.lower() for w in words_to_match)
+            ) and param_name not in params_that_are_filenames:
+                params_that_are_filenames.append(param_name)
+                returning.extend(to_list_if_not_already(runtime_value))
+        return returning
+
+    output_filenames = look_for_variables_with(OutputPath, [str(OutputPath)])
+    input_filenames = look_for_variables_with(
+        InputPath, [str(InputPath), "path", "file"]
     )
-    # Because we take in anything that has 'path' or 'file' in the name as Inputs,
-    # we've probably matched with some output variables too. Let's just discard those.
-    input_filenames = set(input_filenames) ^ set(output_filenames)
+
+    could_change_behavior = [
+        (param_name, argument_value)
+        for param_name, argument_value in name_and_args
+        # if param_name not in params_that_are_filenames and
+        if not param_name.startswith("_")
+    ]
+    care_about = ", ".join(
+        "{}:{!r}".format(param_name, argument_value)
+        for param_name, argument_value in could_change_behavior
+    )
+    if care_about:
+        last_ran_with_these_params = str(
+            CachePath("magicinvoke", _hash(care_about))
+        )
+        input_filenames.append(last_ran_with_these_params)
 
     # Gonna leave these here in case anyone wants to use them later :D
     func.outputs = output_filenames
     func.inputs = input_filenames
 
-    skippable = timestamp_differ(input_filenames, output_filenames)
+    debug(
+        "for func {}, inputs: {} outputs: {}".format(
+            func.__name__, input_filenames, output_filenames
+        )
+    )
+    # Try to coerce before tiemstamp_differ to avoid cryptic error msg
+    for p in itertools.chain(input_filenames, output_filenames):
+        try:
+            Path(p)
+        except:
+            # TODO could keep around the info about which param name caused it
+            # If you wanted to, you could monkeypatch magicinvoke.Input/Output
+            # :)
+            raise ValueError(
+                "Unable to coerce {} to Path. Do you have a "
+                "parameter with 'input' or 'output' in its name "
+                "that is not meant to be a Path?".format(p)
+            )
+    skippable, youngest_input, reason = timestamp_differ(
+        input_filenames, output_filenames
+    )
+    debug(
+        "{}skipping {} because {}".format(
+            "not " if not skippable else "", func.__name__, reason
+        )
+    )
     if skippable:
         return Skipped
-    return func(*args, **kwargs)
+    result = func(*args, **kwargs)
+    if not care_about:  # There were no flags that could affect output.
+        return result
+    """
+    There could be a racy condition here if someone changes one of the output
+    files between your function returning and us creating this file. But if
+    that happens, why are you writing the file at all?
+    """
+    # TODO do these touches with raw python
+    if youngest_input:
+        # All files existed, so we can just use the timestamp of the youngest input
+        # for our 'last ran' file.
+        run(
+            "touch -r '{}' '{}'".format(
+                youngest_input, last_ran_with_these_params
+            )
+        )
+    else:
+        # Could be a few cases.
+        # All of the params were valid and the function ran;
+        #     We'd prefer a last_ran older than our oldest output
+        # Some of the params were invalid and the function ran non-ideally
+        #     We don't want to create a last_ran.
+        # To figure out which case we're in, we'll just re-use timestamp differ :)
+        input_filenames.remove(last_ran_with_these_params)
+        skippable, youngest_input, _ = timestamp_differ(
+            input_filenames, output_filenames
+        )
+        if skippable and youngest_input:  # All is well, all files were found!
+            run(
+                "touch -r '{}' '{}'".format(
+                    youngest_input, last_ran_with_these_params
+                )
+            )
+
+    return result
+
+    # TODO Write something that cds to all the example folders and runs them :)
 
 
 def timestamp_differ(input_filenames, output_filenames):
     """
-    Returns True if all input files are older than output files, or there
-    are none of either (i.e. a source or sink).
+    :returns: Two-tuple:
+      [0] -- True if all input files are older than output files and all files exist
+      [1] -- Path of youngest input.
+      [2] -- Why we're able to skip (or not).
     """
     # Always run things that don't produce a file or depend on files.
     if not input_filenames or not output_filenames:
-        # log.debug(event="ts_differ.have_to_run", skipping=False)
-        return False
+        return (
+            False,
+            None,
+            "has_inputs:{} has_outputs:{}".format(
+                bool(input_filenames), bool(output_filenames)
+            ),
+        )
 
     # If any files are missing (whether inputs or outputs),
     # run the task. We run when missing inputs because hopefully
     # their task will error out and notify the user, rather than silently
     # ignore that it was supposed to do something.
     paths = itertools.chain(input_filenames, output_filenames)
-    if any(not Path(p).exists() for p in paths):
-        # log.debug(event="ts_differ.filemissing", skipping=False, paths=paths)
-        return False
+    for p in paths:
+        if not Path(p).exists():
+            return False, None, "{} missing".format(p)
 
     # All exist, now make sure oldest output is older than youngest input.
     PathInfo = collections.namedtuple("PathInfo", ["path", "modified"])
@@ -435,10 +598,13 @@ def timestamp_differ(input_filenames, output_filenames):
     oldest_output = sort_by_timestamps(output_filenames)[0]
     youngest_input = sort_by_timestamps(input_filenames)[-1]
     skipping = youngest_input.modified < oldest_output.modified
-    # log.debug(event="ts_differ.all_files_exist",
-    # youngest_input=youngest_input.path, oldest_output=oldest_output.path,
-    # skipping=skipping)
-    return skipping
+    return (
+        skipping,
+        youngest_input.path,
+        "youngest_input={}, oldest_output={}".format(
+            youngest_input, oldest_output
+        ),
+    )
 
 
 def get_directly_passed(func, sig, args, kwargs):
@@ -457,7 +623,6 @@ def get_directly_passed(func, sig, args, kwargs):
         if "too many" in e.args[0]:
             msg = "{!r} accepts {} arguments but received {}".format(
                 func.__name__,
-                # -1 is for ctx
                 len(
                     [
                         p
@@ -466,10 +631,14 @@ def get_directly_passed(func, sig, args, kwargs):
                         or p.kind is p.POSITIONAL_ONLY
                     ]
                 ),
-                # Note that this isn't strictly correct, but it's probably right most of the time.
+                # Might not be 100% correct
                 len(args) + len(kwargs),
             )
-            raise TypeError(msg)
+            raise TypeError(msg) from None
+        if "unexpected keyword" in e.args[0]:
+            msg = "{!r} ".format(func.__name__)
+            # from None -- handy trick to get rid of that crappy default error
+            raise TypeError(msg + e.args[0]) from None
         raise
 
     for param in sig.parameters.values():

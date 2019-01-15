@@ -1,34 +1,24 @@
 from pathlib import Path
 
-# Hardcode our sources, but we could automagically detect them.
-sources = ["a.c", "b.c", "c.c"]
-
-
-# Setup a workspace.
+# Setup a workspace when config is loaded because why not
 prefix = Path("./ws")
 prefix.mkdir(exist_ok=True)
+
+# Hardcode our sources, but we could automagically detect them.
+sources = ["a.c", "b.c", "c.c"]
 sources = [prefix / s for s in sources]
 
 
-# Configure an dict that will supply defaults to all of our arguments
 def replace_suffix(replacing_list, with_what):
     return list(s.with_suffix(with_what) for s in replacing_list)
 
 
-myinfo = dict(
+# Configure an dict that will supply defaults to all of our arguments
+mycompileinfo = dict(
     cfiles=sources,
-    objectfiles=replace_suffix(sources, ".o"),
+    objectfiles=[source.with_suffix(".o") for source in sources],
     executable_path=prefix / "produced_executable",
 )
 
-
-# Explicitly point out that these functions take ^ that info dict.
-# In the future, it might make sense to do something like a class-based structure,
-# where each task is just a method on a class, and the class's member variables
-# get populated from config / cmd-line args. For now, since ctx doesn't live past
-# task changes, I'm not sure how best to do that.
-clean = (
-    mycompile
-) = invokemycompile = link = run = touch = write_all_the_programs = myinfo
-run["echo"] = True
-run["pty"] = False
+# Turn on echoing so that we can see it work
+run = {"echo": True}

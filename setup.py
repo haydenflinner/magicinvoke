@@ -29,7 +29,7 @@ on GitHub for {}.
 
 # Require instead of vendor cause it has a transitive dependency
 deps = ["pathlib2", "funcsigs"] if sys.version_info[0] == 2 else []
-deps.append("colorama")
+deps.extend(["colorama", "cachepath"])
 
 setup(
     name="magicinvoke",

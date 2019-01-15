@@ -1,0 +1,19 @@
+This is forked replacement of invoke.
+It adds the following features:
+
+Add make-like skip_if task-decorator parameter to allow smarter deduping. #578 
+Currently un-used, even by @skippable, but was tested very thoroughly in
+an older version of @skippable that subtasked Task.
+
+Add *args **kwargs support for tasks. #582 
+    This may not actually be in this code-base, but the patch is there on
+    pyinvoke's PR #582, and should be easy enough to merge back here.
+
+Add error message when can't find specified config #581 
+    If you do `invoke -f myconfig.py` with current invoke version, you don't
+    get an error if that file doesn't exist. We fixed that.
+
+Change kwargs to task behavior. In original invoke, all parameters were always
+passed to a function, even if user didn't supply one (it just fell to default).
+This made @get_params_from_ctx impossible, as we couldn't tell if user passed
+us something or not. So, we patched that.

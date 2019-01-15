@@ -257,8 +257,9 @@ class Task(object):
             context_arg = arg_names.pop(0)
             del spec_dict[context_arg]
         except IndexError:
-            # Dumbest possible way to skip this check on Mocks.
-            if not hasattr(func, "im_class"):
+            # TODO fix the tests so that this isn't necessary with better mocks.
+            if not hasattr(func, "im_class") and "Mock" not in repr(func):
+                # Dumbest imaginable way to skip this check on Mocks.
                 # TODO: see TODO under __call__, this should be same type
                 raise TypeError("Tasks must have an initial Context argument!")
 
