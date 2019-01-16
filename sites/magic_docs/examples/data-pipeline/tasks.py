@@ -82,16 +82,13 @@ def test(ctx):
     def both_ran(stdout):
         assert stdout.strip() == both_stdout.strip()
 
-    # TODO add a MagicTask.clean so that don't have accidents like when I just
-    # deleted people.txt lol
-    ctx.run("rm {}".format(ctx.people.names_and_ages_path), warn=True)
+    assert "cleaned all" in get_peoples_ages(ctx, clean=True).lower()
 
-    # print(repr(ctx.run('invoke print-peoples-ages').stdout.strip))
-    # print(repr(both_stdout))
     both_ran(ctx.run("invoke print-peoples-ages").stdout)
     only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
-    # If you run this test twice, this both_ran will not work; the fact that it's
-    # not necessary is held over in /tmp/. Delete it.
+
+    # If you run `inv test` twice, this both_ran will fail; the fact that it's
+    # not necessary to run print-peoples-ages is stored over in /tmp/.
     both_ran(
         ctx.run(
             "invoke -D people.important_flag=True print-peoples-ages"
@@ -103,5 +100,6 @@ def test(ctx):
         ).stdout
     )
     only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
-    only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
+    ctx.run("invoke get-peoples-ages --clean")
+    both_ran(ctx.run("invoke print-peoples-ages").stdout)
     print("We're good!")

@@ -139,10 +139,10 @@ class Task(object):
 
     def __call__(self, *args, **kwargs):
         # Guard against calling tasks with no context.
-        if not isinstance(args[0], Context):
+        if not args or not isinstance(args[0], Context):
             err = "Task expected a Context as its first arg, got {} instead!"
             # TODO: raise a custom subclass _of_ TypeError instead
-            raise TypeError(err.format(type(args[0])))
+            raise TypeError(err.format(type(args[0]) if args else "no arg"))
 
         called_by_executor = kwargs.pop("_called_by_executor", False)
         run = self.before_call(args, kwargs, called_by_executor)
@@ -258,12 +258,15 @@ class Task(object):
             del spec_dict[context_arg]
         except IndexError:
             # TODO fix the tests so that this isn't necessary with better mocks.
-            if not hasattr(func, "im_class") and "Mock" not in repr(func):
+            if not self._is_mock(func):
                 # Dumbest imaginable way to skip this check on Mocks.
                 # TODO: see TODO under __call__, this should be same type
                 raise TypeError("Tasks must have an initial Context argument!")
 
         return arg_names, spec_dict, special
+
+    def _is_mock(self, func):
+        return hasattr(func, "im_class") or "Mock" in repr(func)
 
     def fill_implicit_positionals(self, positional):
         # TODO 378 Is this good logic for varargs here? Don't think it matters
