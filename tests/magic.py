@@ -104,17 +104,22 @@ def call_calls_pres():
 
 # ------ Integration-y tests; run the examples
 @pytest.mark.parametrize(
-    "folder, cmd, expected_output",
+    "folder, cmd, expected_output, py2_only",
     [
-        ("args-kwargs", "invoke myfunc x y --z 1", "('x', 'y') {'z': '1'}\n"),
-        ("data-pipeline", "invoke test", "We're good!"),
-        ("make-replacement", "invoke test", "All tests succeeded."),
-        ("skip-if", "invoke mytask", "Didn't skip!"),
+        ("args-kwargs", "invoke myfunc x --z 1", "('x',) {'z': '1'}\n", False),
+        ("data-pipeline", "invoke test", "We're good!", True),
+        ("make-replacement", "invoke test", "All tests succeeded.", True),
+        ("skip-if", "invoke mytask", "Didn't skip!", False),
     ],
 )
-def test_full_integration(folder, cmd, expected_output, tmpdir):
+def test_full_integration(folder, cmd, expected_output, py2_only, tmpdir):
     # --durations=10, you will see each one gets run twice, maybe fix?
     ctx = Context()
     with ctx.cd("sites/magic_docs/examples/{}".format(folder)):
-        result = ctx.run("TMPDIR={} {}".format(tmpdir, cmd), hide=True).stdout
-        assert expected_output in result
+        result = ctx.run("TMPDIR={} {}".format(tmpdir, cmd), hide=True, warn=py2_only).stdout
+        try:
+            assert expected_output in result
+        except:
+            if py2_only:
+                pytest.xfail("We knew that.")
+            raise

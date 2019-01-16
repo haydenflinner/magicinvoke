@@ -12,7 +12,7 @@ try:
 except:
     from pathlib2 import Path  # Py2
     from funcsigs import signature, Parameter
-
+from invoke.vendor.six import raise_from
 from invoke import Collection, task, Lazy, run  # noqa
 from invoke.tasks import Task
 from invoke.vendor.decorator import decorate
@@ -297,6 +297,8 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         # this function, call it!
         # debug("Derived params {}".format({a: v for a, v in args_passing.items()
         # if a != 'ctx' and a != 'c'}))
+        # TODO We get an 'unexpected kwarg clean' here in Py2 if try to use it.
+        # Funcsigs bug of not respecting __signature__? Review both sources
         return func(**args_passing)
 
     # myparams = (ctx=None, arg1=None, optionalarg1=olddefault)
@@ -697,11 +699,11 @@ def get_directly_passed(func, sig, args, kwargs):
                 # Might not be 100% correct
                 len(args) + len(kwargs),
             )
-            raise TypeError(msg) from None
+            raise_from(TypeError(msg), None)
         if "unexpected keyword" in e.args[0]:
             msg = "{!r} ".format(func.__name__)
             # from None -- handy trick to get rid of that crappy default error
-            raise TypeError(msg + e.args[0]) from None
+            raise_from(TypeError(msg + e.args[0]), None)
         raise
 
     return ba.arguments
