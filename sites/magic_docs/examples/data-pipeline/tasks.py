@@ -6,11 +6,10 @@ ns = Collection()
 
 
 @ns.magictask(params_from="ctx.people")
-def get_peoples_ages(
-    ctx,
-    names_path,
-    names_and_ages_output_path=Lazy("ctx.people.names_and_ages_path"),
-    important_flag=False,
+def get_peoples_ages(ctx,
+                     names_path,
+                     names_and_ages_output_path=Lazy("ctx.people.names_and_ages_path"),
+                     important_flag=False
 ):
     o = open(names_and_ages_output_path, "w")
     for name in Path(names_path).read_text().splitlines():

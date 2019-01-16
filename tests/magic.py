@@ -116,7 +116,9 @@ def test_full_integration(folder, cmd, expected_output, py2_only, tmpdir):
     # --durations=10, you will see each one gets run twice, maybe fix?
     ctx = Context()
     with ctx.cd("sites/magic_docs/examples/{}".format(folder)):
-        result = ctx.run("TMPDIR={} {}".format(tmpdir, cmd), hide=True, warn=py2_only).stdout
+        result = ctx.run(
+            "TMPDIR={} {}".format(tmpdir, cmd), hide=True, warn=py2_only
+        ).stdout
         try:
             assert expected_output in result
         except:

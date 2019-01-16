@@ -102,7 +102,7 @@ ns.configure(
             # blackening.
             # TODO: this is making it seem like I really do want an explicit
             # arg/conf-opt in the blacken task for "excluded paths"...ha
-            "find_opts": "-and -not \( -path 'sites/*' -or -path './magicinvoke/vendor*' -or -path './invoke/vendor*' -or -path './alt_env*' -or -path './build*' \)"  # noqa
+            "find_opts": "-and -not \( -path 'sites/*' -or -path './magicinvoke/vendor*' -or -path './invoke/vendor*' -or -path './alt_env*' -or -path './build*' -or -path './sites/magic_docs/examples/*' -or -path './tests/' \)"  # noqa
         },
         "tests": {"logformat": LOG_FORMAT, "package": "invoke"},
         "travis": {
