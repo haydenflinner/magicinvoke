@@ -15,7 +15,7 @@ except:
 
 from invoke import Collection, task, Lazy, run  # noqa
 from invoke.tasks import Task
-from invoke.vendor.decorator import decorator, getfullargspec
+from invoke.vendor.decorator import decorate, getfullargspec
 
 from cachepath import CachePath
 
@@ -228,6 +228,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         def traverse_path(param_name):
             if path is None:
                 # TODO Maybe have access to namespaced name by now?
+                # __qualname__?
                 return ctx.config.get(func.__name__, {}).get(
                     param_name, fell_through
                 )
@@ -273,8 +274,9 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             if passing is not fell_through:
                 args_passing[param_name] = passing
 
+        # Now, bind and supply defaults to see if any are still missing.
         ba = sig.bind_partial(**args_passing)
-        # Apply defaults isn't there on funcsig version.
+        # getcallargs isn't there on funcsig version.
         missing = []
         for param in sig.parameters.values():
             if param.name not in ba.arguments and param.default is param.empty:
@@ -293,6 +295,8 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 ),
             )
             raise TypeError(msg)
+        # We've been removing from directly_passed as we derive params, if any
+        # left it's an error
         if directly_passed:
             msg = "{!r} received arguments it didn't recognize: {}".format(
                 func.__name__,
@@ -302,7 +306,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         # Now that we've generated a kwargs dict that is everything we know about how to call
         # this function, call it!
         # debug("Derived params {}".format({a: v for a, v in args_passing.items()
-        # if a != 'ctx' and a != 'c'}))
+        #       if a != 'ctx' and a != 'c'}))
         return func(**args_passing)
 
     myparams = [
@@ -342,8 +346,147 @@ def _hash(obj):
     return hashlib.sha224(obj.encode("utf-8")).hexdigest()
 
 
-@decorator
-def skippable(func, *args, **kwargs):
+class CallInfo(object):
+    def __init__(self, func, args, kwargs, check=False):
+        self.name = func.__name__
+        sig = signature(func)
+        self.sig = sig
+        if check:
+            if len(self._params_not_ctx) == 0:
+                raise ValueError(
+                    "{!r} shouldn't be a @skippable task, it has no in/out parameters!".format(
+                        self.name
+                    )
+                )
+            return
+        # bind here to throw error for too many arguments...
+        ba = sig.bind(*args, **kwargs)
+        # Since we don't have getcallargs on Py2
+        for param in sig.parameters.values():
+            if param.name not in ba.arguments:
+                ba.arguments[param.name] = param.default
+        self.ba = ba
+        self.params_that_are_filenames = []
+        self.flags = [  # Parameters that could change output (but not a path)
+            (param_name, argument_value)
+            for param_name, argument_value in self.names_and_args
+            if not param_name.startswith("_")
+        ]
+        # Input_paths gets mutated later!
+        self.output_paths = self._look_for_variables_with(
+            OutputPath, [str(OutputPath)]
+        )
+        self.input_paths = self._look_for_variables_with(
+            InputPath, [str(InputPath), "path", "file"]
+        )
+
+    @property
+    def names_and_args(self):
+        # This is where we hack popping out ctx if the function is a task.
+        # Maybe drop this; what are the odds someone uses @skippable on a
+        # regular function?
+        return (
+            list(self.ba.arguments.items())[1:]
+            if list(self.ba.arguments.keys())[0] in ["c", "ctx"]
+            else self.ba.arguments.items()
+        )
+
+    @property
+    def _params_not_ctx(self):
+        return [p for p in self.sig.parameters if p not in ["c", "ctx"]]
+
+    def _to_list_if_not_already(self, val):
+        """
+        >>>to_list_if_not_already('xyz')
+        ['xyz']
+        >>>to_list_if_not_already(['xyz'])
+        ['xyz']
+        """
+        if not (isinstance(val, list) or isinstance(val, tuple)):
+            # I don't like checking types explicitly in python, but I can't think of a more
+            # reliable way that wouldn't include strings in py2.
+            return [val]
+        else:
+            return val
+
+    def _look_for_variables_with(self, type_annotation, words_to_match):
+        """Goes through param list. If it looks like a filename, returns its runtime value."""
+        returning = []
+        for param_name, runtime_value in self.names_and_args:
+            # Assume whole list is of one type, that is List<type(list[0])>.
+            # Don't write more complex annotations than that, please :)
+            annotation = self._to_list_if_not_already(
+                self.sig.parameters[param_name].annotation
+            )[0]
+            if (
+                annotation
+                and annotation is type_annotation
+                or any(w in param_name.lower() for w in words_to_match)
+            ) and param_name not in self.params_that_are_filenames:
+                self.params_that_are_filenames.append(param_name)
+                paths = self._to_list_if_not_already(runtime_value)
+                # Try to coerce before timestamp_differ to avoid cryptic error
+                for p in paths:
+                    try:
+                        returning.append(Path(p))
+                    except ValueError:
+                        raise RuntimeError(
+                            "Received invalid path {} for a path-taking parameter."
+                            " Do you have a parameter with 'file' or 'path' in the name"
+                            " that's not supposed to receive a Path?".format(p)
+                        )
+        return returning
+
+
+class FileFlagChecker(object):
+    """
+    Writes a file whose name represents the last call-args used for a task.
+    When can_skip called, mutates the call info's input_path to include
+    the proper file for timestamp diffing.
+
+    TODO would be nice if this class were only created once (per function maybe)
+    so that it could hold a persistent db connection or something?
+    """
+
+    def can_skip(self, ci):
+        if not ci.flags:
+            return True
+        self.care_about = ", ".join(
+            "{}:{!r}".format(param_name, argument_value)
+            for param_name, argument_value in ci.flags
+        )
+        self.last_ran_with_these_params_path = CachePath(
+            "magicinvoke", _hash(self.care_about)
+        )
+        # HACK to add to filenames under consideration here
+        ci.input_paths.append(self.last_ran_with_these_params_path)
+        return True
+
+    def after_run(self, ci, youngest_input):
+        """
+        There could be a racy condition here if someone changes one of the output
+        files between your function returning and us creating this file. But if
+        that happens, why are you writing the file at all?
+
+        Note youngest input here is only the youngest input if all inputs and
+        outputs existed. It's just a random input file if there were any files
+        missing. Doesn't really matter; it gets the same age as _an_ input.
+        """
+        if not ci.flags:  # There were no flags that could affect output.
+            return
+        if youngest_input:
+            # All files existed, so we can just use the timestamp of the youngest input
+            # for our 'last ran' file.
+            run(
+                "touch -r '{}' '{}'".format(
+                    youngest_input, self.last_ran_with_these_params_path
+                )
+            )
+        # elif not youngest_input: Some path was missing or this task doesn't
+        # do I/O
+
+
+def skippable(func, must_be=True, *args, **kwargs):
     """
     Decorator to skip function if input files are older than output files.
 
@@ -409,20 +552,6 @@ def skippable(func, *args, **kwargs):
     .. versionadded:: 0.1
     """
 
-    def to_list_if_not_already(val):
-        """
-        >>>to_list_if_not_already('xyz')
-        ['xyz']
-        >>>to_list_if_not_already(['xyz'])
-        ['xyz']
-        """
-        if not (isinstance(val, list) or isinstance(val, tuple)):
-            # I don't like checking types explicitly in python, but I can't think of a more
-            # reliable way that wouldn't include strings in py2.
-            return [val]
-        else:
-            return val
-
     """
     Here's the plan:
       Create two lists; one for filenames and one for arguments that don't start with _.
@@ -430,93 +559,31 @@ def skippable(func, *args, **kwargs):
       Last_Ran with these parameters must be newer than input_filenames
       Fresh last_ran per set of parameters. Database?
     """
-    sig = signature(func)
-    # bind here to get the error..
-    ba = sig.bind(*args, **kwargs)
-    # Since we don't have getcallargs on Py2
-    for param in sig.parameters.values():
-        if param.name not in ba.arguments:
-            ba.arguments[param.name] = param.default
-    # Name ctx so that we can try to support regular functions, not just Tasks. Untested.
-    if len(ba.arguments.items()) == 0:
-        raise ValueError(
-            "This shouldn't be a skippable task, it has no in or out params or ctx."
-        )
 
-    # This is where we hack popping out ctx if the function is a task. Could
-    # probably drop this; what are the odds someone uses @skippable on a
-    # regular function.
-    name_and_args = (
-        list(ba.arguments.items())[1:]
-        if list(ba.arguments.keys())[0] in ["c", "ctx"]
-        else ba.arguments.items()
-    )
+    # HACK Tyr to make a callInfo to error early. We should really set up an argchecker
+    # here too instead of making a new one on each call.
+    if must_be:
+        CallInfo(func, [], {}, check=True)
+    return decorate(func, _skippable)
 
-    params_that_are_filenames = []
 
-    def look_for_variables_with(type_annotation, words_to_match):
-        returning = []
-        for param_name, runtime_value in name_and_args:
-            # Assume whole list is of one type, that is List<type(list[0])>.
-            # Don't write more complex annotations than that, please :)
-            annotation = to_list_if_not_already(
-                sig.parameters[param_name].annotation
-            )[0]
-            if (
-                annotation
-                and annotation is type_annotation
-                or any(w in param_name.lower() for w in words_to_match)
-            ) and param_name not in params_that_are_filenames:
-                params_that_are_filenames.append(param_name)
-                returning.extend(to_list_if_not_already(runtime_value))
-        return returning
-
-    output_filenames = look_for_variables_with(OutputPath, [str(OutputPath)])
-    input_filenames = look_for_variables_with(
-        InputPath, [str(InputPath), "path", "file"]
-    )
-
-    could_change_behavior = [
-        (param_name, argument_value)
-        for param_name, argument_value in name_and_args
-        # if param_name not in params_that_are_filenames and
-        if not param_name.startswith("_")
-    ]
-    care_about = ", ".join(
-        "{}:{!r}".format(param_name, argument_value)
-        for param_name, argument_value in could_change_behavior
-    )
-    if care_about:
-        last_ran_with_these_params = str(
-            CachePath("magicinvoke", _hash(care_about))
-        )
-        input_filenames.append(last_ran_with_these_params)
-
-    # Gonna leave these here in case anyone wants to use them later :D
-    func.outputs = output_filenames
-    func.inputs = input_filenames
+def _skippable(func, *args, **kwargs):
+    ci = CallInfo(func, args, kwargs)
+    arg_checker = (
+        FileFlagChecker()
+    )  # Future alternative could be DBFileChecker
+    arg_skippable = arg_checker.can_skip(ci)
 
     debug(
         "for func {}, inputs: {} outputs: {}".format(
-            func.__name__, input_filenames, output_filenames
+            ci.name, ci.input_paths, ci.output_paths
         )
     )
-    # Try to coerce before tiemstamp_differ to avoid cryptic error msg
-    for p in itertools.chain(input_filenames, output_filenames):
-        try:
-            Path(p)
-        except:
-            # TODO could keep around the info about which param name caused it
-            # If you wanted to, you could monkeypatch magicinvoke.Input/Output
-            # :)
-            raise ValueError(
-                "Unable to coerce {} to Path. Do you have a "
-                "parameter with 'input' or 'output' in its name "
-                "that is not meant to be a Path?".format(p)
-            )
+
     skippable, youngest_input, reason = timestamp_differ(
-        input_filenames, output_filenames
+        ci.input_paths, ci.output_paths
     )
+    skippable = skippable and arg_skippable
     debug(
         "{}skipping {} because {}".format(
             "not " if not skippable else "", func.__name__, reason
@@ -525,39 +592,7 @@ def skippable(func, *args, **kwargs):
     if skippable:
         return Skipped
     result = func(*args, **kwargs)
-    if not care_about:  # There were no flags that could affect output.
-        return result
-    """
-    There could be a racy condition here if someone changes one of the output
-    files between your function returning and us creating this file. But if
-    that happens, why are you writing the file at all?
-    """
-    # TODO do these touches with raw python
-    if youngest_input:
-        # All files existed, so we can just use the timestamp of the youngest input
-        # for our 'last ran' file.
-        run(
-            "touch -r '{}' '{}'".format(
-                youngest_input, last_ran_with_these_params
-            )
-        )
-    else:
-        # Could be a few cases.
-        # All of the params were valid and the function ran;
-        #     We'd prefer a last_ran older than our oldest output
-        # Some of the params were invalid and the function ran non-ideally
-        #     We don't want to create a last_ran.
-        # To figure out which case we're in, we'll just re-use timestamp differ :)
-        input_filenames.remove(last_ran_with_these_params)
-        skippable, youngest_input, _ = timestamp_differ(
-            input_filenames, output_filenames
-        )
-        if skippable and youngest_input:  # All is well, all files were found!
-            run(
-                "touch -r '{}' '{}'".format(
-                    youngest_input, last_ran_with_these_params
-                )
-            )
+    arg_checker.after_run(ci, youngest_input)
 
     return result
 
@@ -588,7 +623,8 @@ def timestamp_differ(input_filenames, output_filenames):
     paths = itertools.chain(input_filenames, output_filenames)
     for p in paths:
         if not Path(p).exists():
-            return False, None, "{} missing".format(p)
+            # HACK Not the youngest input, but it currently doesn't matter
+            return False, input_filenames[0], "{} missing".format(p)
 
     # All exist, now make sure oldest output is older than youngest input.
     PathInfo = collections.namedtuple("PathInfo", ["path", "modified"])
@@ -695,18 +731,23 @@ def magictask(*args, **kwargs):
     klass = kwargs.pop("klass", Task)
     collection = kwargs.pop("collection", None)
     get_params_args = {
-        arg: kwargs.pop(arg, None) for arg in ("path", "derive_kwargs")
+        arg: kwargs.pop(arg, None) for arg in ("params_from", "derive_kwargs")
     }
+    get_params_args["path"] = get_params_args.pop("params_from", None)
     # @task -- no options were (probably) given.
     if len(args) == 1 and callable(args[0]) and not isinstance(args[0], Task):
-        t = klass(get_params_from_ctx(skippable(args[0])), **kwargs)
+        t = klass(
+            get_params_from_ctx(skippable(args[0], must_be=False)), **kwargs
+        )
         if collection is not None:
             collection.add_task(t)
         return t
     # @task(options)
     def inner(inner_obj):
         obj = klass(
-            get_params_from_ctx(skippable(inner_obj), **get_params_args),
+            get_params_from_ctx(
+                skippable(inner_obj, must_be=False), **get_params_args
+            ),
             # Pass in any remaining kwargs as-is.
             **kwargs
         )

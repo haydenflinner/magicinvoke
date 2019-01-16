@@ -18,7 +18,7 @@ def print_name(c, name):
     print(name)
 
 
-@magictask(path="ctx.x.y")
+@magictask(params_from="ctx.x.y")
 def print_x_y_z(c, z):
     # Tests both parameter expansion and used to test -D x.y.z syntax
     print(z)

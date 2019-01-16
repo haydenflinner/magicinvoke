@@ -5,22 +5,13 @@ from magicinvoke import Collection, Lazy, Path
 ns = Collection()
 
 
-# This addition (ns.task decorator) courtesy of @judy2k :)
-@ns.magictask(path="ctx.people")
+@ns.magictask(params_from="ctx.people")
 def get_peoples_ages(
     ctx,
     names_path,
-    # You could just use no default and type-annotate as an OutputPath
-    # instead of ensuring `output` is in the name, but that breaks Py2
     names_and_ages_output_path=Lazy("ctx.people.names_and_ages_path"),
     important_flag=False,
 ):
-    """
-    names_path: File where each line is a person's name
-    names_and_ages_path: Output file where each line is person's name,age
-    important_flag: Doesn't actually change output, but magicinvoke
-    will treat it like it does because it doesn't start with `_`.
-    """
     o = open(names_and_ages_output_path, "w")
     for name in Path(names_path).read_text().splitlines():
         print("Getting age for {}".format(name))
@@ -30,14 +21,10 @@ def get_peoples_ages(
     print("Done writing results to {}".format(names_and_ages_output_path))
 
 
-@ns.magictask(path="ctx.people")
+@ns.magictask(params_from="ctx.people")
 def print_peoples_ages(ctx, names_and_ages_path):
-    """
-    names_and_ages_path: File where each line is a person's name, age
-    Prints the names and ages found therein
-    """
-    # Explicit __call__ has same effect as putting it in .pre, still won't run
-    # if not necessary.
+    # Explicit __call__ of get_peoples_ages has same effect as putting it in
+    # magictask.pre: still won't run if not necessary.
     get_peoples_ages(ctx)
     print("Reading results from {}".format(names_and_ages_path))
     for line in Path(names_and_ages_path).read_text().splitlines():
@@ -55,12 +42,17 @@ ns.configure(
     }
 )
 
+"""
+Don't mind rest of this file :)
+Just here to ensure examples behave as expected
+"""
 
-@ns.magictask(path="ctx.people")
+
+@ns.magictask(params_from="ctx.people")
 def test(ctx):
+
     from textwrap import dedent
 
-    """Don't mind me; I'm just here to ensure examples behave as expected :)"""
     only_print_expected_stdout = dedent(
         """
         Reading results from people-with-ages.txt

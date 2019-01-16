@@ -12,7 +12,7 @@ from magicinvoke import (
 """Yes, I'm aware that this should not be used as a build tool :)"""
 
 
-@magictask(path="ctx.mycompileinfo")
+@magictask(params_from="ctx.mycompileinfo")
 def write_all_the_programs(
     ctx, cfiles, executable_cfile=Lazy("ctx.mycompileinfo.cfiles[0]")
 ):
@@ -21,14 +21,14 @@ def write_all_the_programs(
     ctx.run("touch " + " ".join(str(x) for x in cfiles))
 
 
-@magictask(path="ctx.mycompileinfo")
+@magictask(params_from="ctx.mycompileinfo")
 def mycompile(ctx, cfiles, objectfiles: [OutputPath]):
     """Then compile them"""
     for c, o in zip(cfiles, objectfiles):
         ctx.run("gcc -c {} -o {}".format(c, o))
 
 
-@magictask(path="ctx.mycompileinfo", pre=[mycompile])
+@magictask(params_from="ctx.mycompileinfo", pre=[mycompile])
 def link(ctx, objectfiles: [InputPath], executable_path: OutputPath):
     """Now we link them into our final executable..."""
     ctx.run(
@@ -38,7 +38,7 @@ def link(ctx, objectfiles: [InputPath], executable_path: OutputPath):
     )
 
 
-@magictask(path="ctx.mycompileinfo", pre=[link])
+@magictask(params_from="ctx.mycompileinfo", pre=[link])
 def run(ctx, executable_path: InputPath):
     """And finally run the executable, exiting with exitcode=255."""
     # Calling link(ctx) here would would work just as well as pre=[link], but
@@ -49,7 +49,7 @@ def run(ctx, executable_path: InputPath):
     ctx.run("{}".format(executable_path))
 
 
-@magictask("path=ctx.mycompileinfo")
+@magictask(params_from="ctx.mycompileinfo")
 def touch(ctx, cfiles):
     """
     This task provided so that you can poke the files yourself and see that we
@@ -59,7 +59,7 @@ def touch(ctx, cfiles):
         ctx.run("touch {}".format(f))
 
 
-@magictask(path="ctx.mycompileinfo")
+@magictask(params_from="ctx.mycompileinfo")
 def clean(ctx, cfiles, objectfiles, executable_path):
     removing = " ".join(
         str(p) for p in itertools.chain(cfiles, objectfiles, [executable_path])

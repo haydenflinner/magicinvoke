@@ -48,7 +48,7 @@ def expand_ctx(ctx):
 def expand_ctx_path():
     ctx = Context(Config({"random": {"test_task": {"x": 1, "y": 2}}}))
 
-    @magictask(path="ctx.random.test_task")
+    @magictask(params_from="ctx.random.test_task")
     def test_task(ctx, x, y=None):
         return x, y
 
@@ -59,7 +59,7 @@ def expand_ctx_path():
 def callable_default():
     ctx = Context(Config({"x": 1, "z": 2}))
 
-    @magictask(path="ctx")
+    @magictask(params_from="ctx")
     def test_task(ctx, x, y=lambda ctx: ctx.z):
         return x, y
 
@@ -70,7 +70,7 @@ def callable_default():
 def proper_order_false():
     ctx = Context(Config({"x": False}))
 
-    @magictask(path="ctx")
+    @magictask(params_from="ctx")
     def test_task(ctx, x=True):
         return x
 
@@ -107,13 +107,13 @@ def call_calls_pres():
     "folder, cmd, expected_output",
     [
         ("args-kwargs", "invoke myfunc x y --z 1", "('x', 'y') {'z': '1'}\n"),
-        ("data-pipeline", "invoke print-peoples-ages", "Done!"),
         ("data-pipeline", "invoke test", "We're good!"),
         ("make-replacement", "invoke test", "All tests succeeded."),
         ("skip-if", "invoke mytask", "Didn't skip!"),
     ],
 )
 def test_full_integration(folder, cmd, expected_output, tmpdir):
+    # --durations=10, you will see each one gets run twice, maybe fix?
     ctx = Context()
     with ctx.cd("sites/magic_docs/examples/{}".format(folder)):
         result = ctx.run("TMPDIR={} {}".format(tmpdir, cmd), hide=True).stdout
