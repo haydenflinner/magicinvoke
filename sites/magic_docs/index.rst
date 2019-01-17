@@ -8,15 +8,11 @@ adds support for lots of goodies:
 * ``*args`` **and** ``**kwargs`` **support!**
   See how easy it is here: :ref:`args-kwargs`. 
 
-* **Make-like file dependency recognition and work-avoidance!**
-  Check out a basic
-  :ref:`data-pipeline`.
-  or a Py3-specific, more advanced 
-  :ref:`make-replacement`.
+* **Program.invoke, thanks @rectalogic!** Example usage::
 
-  For more, check out :meth:`magicinvoke.skippable`. Very useful when
-  you won't want something as cryptic or platform-specific as Make and bash,
-  but you also want to use Python tools like matplotlib or numpy.
+    @task
+    def mytask(c, recursed=False):
+      program.invoke(c, "mytask", recursed=True)
 
 * **Automatic ctx->parameter expansion!**
   Have you ever wondered why you can put ``'run': {'echo': True}`` in
@@ -24,10 +20,25 @@ adds support for lots of goodies:
   ``ctx.run`` calls, but you **can't do the same for your own tasks?**
 
   Wonder no longer with :meth:`magicinvoke.get_params_from_ctx`! Here's how you
-  would implement a task like ctx.run::
-      @magictask(params_from='ctx')
+  would implement a task like ctx.run (note that ``params_from`` is only needed
+  to be explicit; it defaults to ``task.name``)::
+
+      @magictask(params_from='ctx.myrun')
       def myrun(ctx, cmd, echo=False):
           pass
+
+* **Make-like file dependency recognition and work-avoidance!**
+  Check out a basic
+  :ref:`data-pipeline`.
+  or a Py3-specific, more advanced 
+  :ref:`make-replacement`.
+
+  For more, check out :meth:`magicinvoke.skippable`. Very useful when
+      you won't want something as cryptic or platform-specific as Make and bash,
+      but you also want to use Python tools like matplotlib or numpy.
+
+  Also gives each task which is detected to write out to a file a ``clean``
+      and ``force_run`` parameter, which do what they say on the tin.
 
 * **Arbitrary task filtering!**
     Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
@@ -38,6 +49,8 @@ adds support for lots of goodies:
     Merges the very helpful
     `patch <https://github.com/pyinvoke/invoke/pull/527#issue-189000872>`_
     written by @judy2k.
+
+ 
 
 * **Bugfixes**
 
@@ -56,6 +69,8 @@ adds support for lots of goodies:
 
 Jump In
 --------
+``pip uninstall -y invoke; pip install magicinvoke``
+
 **Beginner's Note** 
 `Invoke's documentation <http://pyinvoke.org>`_ is the best place to start,
 as the majority of using this library is just like using regular ``invoke``.
