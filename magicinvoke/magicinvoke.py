@@ -729,6 +729,9 @@ def magictask(*args, **kwargs):
         2. Your task won't run if its output files are newer than its input files.
            See :meth:`magicinvoke.skippable`'s documentation for more details and help.
 
+    Note the ``path`` argument on :meth:`magicinvoke.get_params_from_ctx` has been
+    renamed to ``params_from`` in this decorator for clearer code.
+
     This decorator is just a wrapper for the sequence::
 
         @task

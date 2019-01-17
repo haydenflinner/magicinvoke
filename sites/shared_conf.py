@@ -14,6 +14,7 @@ html_theme_options = {
     "github_user": "haydenflinner",
     "github_repo": "magicinvoke",
     "sidebar_width": "300px",  # +30px from default cause we gotta long name :D
+    "page_width": "50%"
     # "analytics_id": "UA-18486793-3",
     # "travis_button": True,
     # "codecov_button": True,

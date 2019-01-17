@@ -522,6 +522,23 @@ Core options:
                     stdout, _ = run("myapp --help", program=p, invoke=False)
                     assert expected in stdout
 
+            def test_invoke_invoke(self):
+                from invoke import task, Context
+
+                @task
+                def mytask(ctx, kwarg=False):
+                    assert kwarg
+                    return kwarg, "Here!"
+
+                coll = Collection(task1=mytask)
+                p = Program(namespace=coll)
+                p.parse_collection()
+                ctx = Context()
+                p.parse_core([])
+                res = p.invoke(ctx, "task1", kwarg=True)
+                assert res[0]
+                assert res[1] == "Here!"
+
             def core_help_doesnt_get_mad_if_loading_fails(self):
                 # Expects no tasks.py in root of FS
                 with cd(ROOT):

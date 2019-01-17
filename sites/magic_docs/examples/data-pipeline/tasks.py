@@ -41,17 +41,17 @@ ns.configure(
     }
 )
 
+
+
+
 """
 Don't mind rest of this file :)
-Just here to ensure examples behave as expected
+Our integration tests run `invoke tests` ensure examples behave as expected
 """
 
-
-@ns.magictask(params_from="ctx.people")
+@ns.magictask
 def test(ctx):
-
     from textwrap import dedent
-
     only_print_expected_stdout = dedent(
         """
         Reading results from people-with-ages.txt

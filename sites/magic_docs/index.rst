@@ -9,22 +9,35 @@ adds support for lots of goodies:
   See how easy it is here: :ref:`args-kwargs`. 
 
 * **Make-like file dependency recognition and work-avoidance!**
-  :ref:`make-replacement` or :ref:`data-pipeline`.
+  Check out a basic
+  :ref:`data-pipeline`.
+  or a Py3-specific, more advanced 
+  :ref:`make-replacement`.
+
   For more, check out :meth:`magicinvoke.skippable`. Very useful when
-  you won't want something as cryptic or platform-specific as Make or bash,
-  but you also don't want to go full CMake.
+  you won't want something as cryptic or platform-specific as Make and bash,
+  but you also want to use Python tools like matplotlib or numpy.
 
 * **Automatic ctx->parameter expansion!**
   Have you ever wondered why you can put ``'run': {'echo': True}`` in
   ``invoke.yaml`` and suddenly ``echo=True`` gets passed to all
   ``ctx.run`` calls, but you **can't do the same for your own tasks?**
 
-  Wonder no longer with :meth:`magicinvoke.get_params_from_ctx`!
+  Wonder no longer with :meth:`magicinvoke.get_params_from_ctx`! Here's how you
+  would implement a task like ctx.run::
+      @magictask(params_from='ctx')
+      def myrun(ctx, cmd, echo=False):
+          pass
 
 * **Arbitrary task filtering!**
     Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
     `from this issue
     <https://github.com/pyinvoke/invoke/issues/461>`_
+
+* **Single-step namespaced tasks!**
+    Merges the very helpful
+    `patch <https://github.com/pyinvoke/invoke/pull/527#issue-189000872>`_
+    written by @judy2k.
 
 * **Bugfixes**
 

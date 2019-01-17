@@ -1,20 +1,26 @@
 =======================================
-File dependency resolution!
+Cache slow steps transparently!
 =======================================
 .. _data-pipeline:
 
-Try it!
---------
-``invoke call-me -i people.txt -o results.txt``
+Data pipeline
+--------------
+``invoke print-peoples-ages``
 
-You should end up with an executable under ``ws/`` that exits with code 255.
+``invoke print-peoples-ages``
+
+You should observe that the 'expensive' get step only happened the first time.
 
 **tasks.py**
 
-Note the function ``testcompile``, which is just a wrapper for compile
-that doesn't have to know anything about the parameters it takes!
-That's because of :meth:`magicinvoke.get_params_from_ctx`, which was applied by
-:meth:`magicinvoke.magictask`.
+Below is a relatively simple tasks file that defines two tasks. One which
+does something 'expensive', like get a list of peoples' ages from a database.
+The next which just prints those results. The thing to notice
+(besides the ns.task decorator and params_from kwarg) is that calling
+get_peoples_ages from print_peoples_ages doesn't actually result in the
+ages being re-calculated, since :meth:`magicinvoke.skippable` recognizes that
+the output
+would not change since the inputs haven't changed.
 
 .. literalinclude:: tasks.py
    :linenos:

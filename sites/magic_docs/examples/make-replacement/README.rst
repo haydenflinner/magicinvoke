@@ -3,7 +3,7 @@ File dependency resolution!
 =======================================
 .. _make-replacement:
 
-Dumb build system
+Make replacement
 -----------------
 ``invoke write-all-the-programs run``
 

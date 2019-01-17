@@ -543,6 +543,14 @@ class Program(object):
         self.print_help()
         raise Exit
 
+    def invoke(self, context, task_name, **kwargs):
+        """Usage: program.execute(ctx, "task-name", mykwarg=True)"""
+        executor = self.executor_class(
+            self.collection, config=context.config, core=self.core
+        )
+        results = executor.execute((task_name, kwargs))
+        return results[self.collection[task_name]]
+
     def execute(self):
         """
         Hand off data & tasks-to-execute specification to an `.Executor`.
