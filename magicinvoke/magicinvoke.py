@@ -576,6 +576,7 @@ def skippable(func, must_be=True, *args, **kwargs):
 
     # Convince invoke to pass us --clean and --force-run flags
     if output_params:
+        # I tried pos_or_kwarg here to try to fix py2; no dice.
         sig = signature(func)
         myparams = collections.OrderedDict(sig.parameters)
         myparams["clean"] = Parameter(
