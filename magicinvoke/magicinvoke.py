@@ -466,6 +466,9 @@ class FileFlagChecker(object):
         ci.input_paths.append(self.last_ran_with_these_params_path)
         return True
 
+    def clean(self, ci):
+        CachePath("magicinvoke", ci.name).rm()
+
     def after_run(self, ci, youngest_input):
         """
         There could be a racy condition here if someone changes one of the output
@@ -604,6 +607,7 @@ def _skippable(func, *args, **kwargs):
         debug("Cleaning {}!".format(ci.name))
         for p in ci.output_paths:
             p.rm()
+        func.checker.clean(ci)
         if not force_run:
             return "Cleaned all {} output files!".format(len(ci.output_paths))
 

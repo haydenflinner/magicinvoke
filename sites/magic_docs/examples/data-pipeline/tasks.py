@@ -83,11 +83,13 @@ def test(ctx):
 
     assert "cleaned all" in get_peoples_ages(ctx, clean=True).lower()
 
+    print("1")
     both_ran(ctx.run("invoke print-peoples-ages").stdout)
     only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
 
     # If you run `inv test` twice, this both_ran will fail; the fact that it's
     # not necessary to run print-peoples-ages is stored over in /tmp/.
+    print("2")
     both_ran(
         ctx.run(
             "invoke -D people.important_flag=True print-peoples-ages"
@@ -98,6 +100,7 @@ def test(ctx):
             "invoke -D people.important_flag=True print-peoples-ages"
         ).stdout
     )
+    print("3")
     only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
     ctx.run("invoke get-peoples-ages --clean")
     both_ran(ctx.run("invoke print-peoples-ages").stdout)
