@@ -13,11 +13,12 @@ except:
     from pathlib2 import Path  # Py2
     from funcsigs import signature, Parameter
 from invoke.vendor.six import raise_from
+from invoke.vendor.six.moves import filterfalse
 from invoke import Collection, task, Lazy, run  # noqa
 from invoke.tasks import Task
 from invoke.vendor.decorator import decorate
 
-from cachepath import CachePath
+import cachepath  # noqa Add .rm to Paths
 
 
 def enable_logging(disable_invoke_logging=True):
@@ -322,17 +323,9 @@ Skipped = "Skipped because output files newer than all input files."
 
 
 def _hash(obj):
-    # Hope your __str__ doesn't include things that don't matter :)
-    import re
-
-    # TODO automated coverage of plain; it's the one I use so usually good,
-    # but doesn't hurt
     if os.getenv("MAGICINVOKE_PLAINTEXT_ARGS"):
         s = obj
-        s = str(s).strip().replace(" ", "_")
-        # TODO pretty this up, it's horrid. Make it
-        # func.__name arg1 arg2 arg3 --kv 1 --kv2 2
-        return re.sub(r"(?u)[^-\w.]", "-", s)
+        return s
     return hashlib.sha224(obj.encode("utf-8")).hexdigest()
 
 
@@ -370,6 +363,8 @@ class CallInfo(object):
             for param_name, argument_value in self.ba.arguments.items()
             if not param_name.startswith("_")
             and param_name not in ["c", "ctx"]
+            and param_name not in self.output_params
+            and param_name not in self.input_params
         ]
         # Input_paths gets mutated later!
         self.output_paths = self._coerce_paths(self.output_params)
@@ -417,11 +412,14 @@ class CallInfo(object):
                 try:
                     returning.append(Path(p))
                 except (ValueError, TypeError):
-                    raise ValueError(
-                        "Received invalid path {} for a path-taking parameter {}."
+                    msg = (
+                        "Received invalid path {!r} for path-taking parameter {!r}."
                         " Do you have a parameter with 'file' or 'path' in the name"
-                        " that's not supposed to receive Paths?".format(p, p)
+                        " that's not supposed to receive Paths?".format(
+                            p, name
+                        )
                     )
+                    debug(msg)
         return returning
 
     def _look_for_params_with(self, type_annotation, words_to_match):
@@ -448,26 +446,67 @@ class CallInfo(object):
 class FileFlagChecker(object):
     """
     Writes a file whose name represents the last call-args used for a task.
-    When can_skip called, mutates the call info's input_path to include
-    the proper file for timestamp diffing.
     """
 
     def can_skip(self, ci):
         if not ci.flags:
-            return True
-        self.care_about = ", ".join(
-            "{}:{!r}".format(param_name, argument_value)
-            for param_name, argument_value in ci.flags
+            return SkipResult(True, "has no flags")
+
+        self.care_about = _hash(
+            "task={}\nflags={}".format(
+                ci.name,
+                ", ".join(
+                    "{}:{!r}".format(param_name, argument_value)
+                    for param_name, argument_value in ci.flags
+                ),
+            )
         )
-        self.last_ran_with_these_params_path = CachePath(
-            "magicinvoke", ci.name, _hash(self.care_about)
+
+        can_skip = True
+        for output_path in ci.output_paths:
+            if not output_path.exists():
+                return SkipResult(
+                    False, "output {!r} doesn't exist yet".format(output_path)
+                )
+            # Assumes non-root, but if folder, still works!
+            last_called = self.get_flags_for_last_run(output_path)
+            if last_called != self.care_about:
+                can_skip = False
+        return SkipResult(
+            can_skip,
+            "files were last generated with {} flags".format(
+                "same" if can_skip else "different"
+            ),
         )
-        # HACK to add to filenames under consideration here
-        ci.input_paths.append(self.last_ran_with_these_params_path)
-        return True
+
+    def _file_path_for_path(self, path):
+        """
+        Possible schemes:
+          1. /tmp/minv/path/goes/here
+          2. actualpath.parent/.minv/actualpath.name
+          3. A database lol
+
+        We go with 2 here because 1 felt too magic, didn't allow absolute vs
+        rel paths, wasn't visible to user.
+        """
+        # 1. p = CachePath('minv', path), skip the p.parent.mkdir
+        # 2:
+        p = Path(path.parent, ".minv", path.name)
+        p.parent.mkdir(exist_ok=True)
+        if not p.exists():
+            p.touch()
+
+        return p
+
+    def set_flags_for_last_run(self, output_path, call_params):
+        self._file_path_for_path(output_path).write_text(self.care_about)
+
+    def get_flags_for_last_run(self, output_path):
+        return self._file_path_for_path(output_path).read_text().strip()
 
     def clean(self, ci):
-        CachePath("magicinvoke", ci.name).rm()
+        for path in ci.output_paths:
+            self._file_path_for_path(path).rm()
 
     def after_run(self, ci, youngest_input):
         """
@@ -479,18 +518,15 @@ class FileFlagChecker(object):
         outputs existed. It's just a random input file if there were any files
         missing. Doesn't really matter; it gets the same age as _an_ input.
         """
-        if not ci.flags:  # There were no flags that could affect output.
-            return
-        if youngest_input:
-            # All files existed, so we can just use the timestamp of the youngest input
-            # for our 'last ran' file.
-            run(
-                "touch -r '{}' '{}'".format(
-                    youngest_input, self.last_ran_with_these_params_path
-                )
-            )
-        # elif not youngest_input: Some path was missing or this task doesn't
-        # do I/O
+        if not ci.flags:
+            return  # There were no flags that could affect output.
+
+        if not youngest_input:
+            return  # There are no inputs or one was missing
+
+        # All files existed, let's write out the flags used to gen outputs
+        for path in ci.output_paths:
+            self._file_path_for_path(path).write_text(self.care_about)
 
 
 def skippable(func, must_be=True, *args, **kwargs):
@@ -593,6 +629,9 @@ def skippable(func, must_be=True, *args, **kwargs):
     return decorate(func, _skippable)
 
 
+SkipResult = collections.namedtuple("SkipResult", ["skippable", "reason"])
+
+
 def _skippable(func, *args, **kwargs):
     ci = CallInfo(func).bind(args, kwargs)
     force_run = kwargs.pop("force_run", False)
@@ -604,7 +643,7 @@ def _skippable(func, *args, **kwargs):
         )
     )
     if clean:
-        debug("Cleaning {}!".format(ci.name))
+        debug("Cleaning {!r}: {!r}!".format(ci.name, ci.output_paths))
         for p in ci.output_paths:
             p.rm()
         func.checker.clean(ci)
@@ -612,22 +651,33 @@ def _skippable(func, *args, **kwargs):
             return "Cleaned all {} output files!".format(len(ci.output_paths))
 
     # Future alternative could be DBFileChecker
-    func.checker.can_skip(ci)
+    check_result = func.checker.can_skip(ci)
+    fs_result, youngest_input = _timestamp_differ(ci)
 
-    skippable, youngest_input, reason = timestamp_differ(
-        ci.input_paths, ci.output_paths
+    failing_result = next(
+        filterfalse(lambda x: x.skippable, (check_result, fs_result)), None
     )
+    # Just use the logs from fs checker if no one complained and forced a run
+    result = failing_result if failing_result is not None else fs_result
     debug(
         "{}skipping {} because {}".format(
-            "not " if not skippable else "", func.__name__, reason
+            "not " if not result else "", func.__name__, result.reason
         )
     )
-    if skippable and not force_run:
+
+    if result.skippable and not force_run:
         return Skipped
+
     result = func(*args, **kwargs)
+
     func.checker.after_run(ci, youngest_input)
 
     return result
+
+
+def _timestamp_differ(ci):
+    res = timestamp_differ(ci.input_paths, ci.output_paths)
+    return SkipResult(res[0], res[2]), res[1]
 
 
 def timestamp_differ(input_filenames, output_filenames):
