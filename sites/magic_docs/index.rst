@@ -14,10 +14,14 @@ adds support for lots of goodies:
     def mytask(c, recursed=False):
       program.invoke(c, "mytask", recursed=True)
 
+  `Longer explanation here. <https://github.com/pyinvoke/invoke/pull/613>`_
+
+
+
 * **Automatic ctx->parameter expansion!**
   Have you ever wondered why you can put ``'run': {'echo': True}`` in
   ``invoke.yaml`` and suddenly ``echo=True`` gets passed to all
-  ``ctx.run`` calls, but you **can't do the same for your own tasks?**
+  ``ctx.run()``s, but you **can't do the same for your own tasks?**
 
   Wonder no longer with :meth:`magicinvoke.get_params_from_ctx`! Here's how you
   would implement a task like ctx.run (note that ``params_from`` is only needed
@@ -33,12 +37,12 @@ adds support for lots of goodies:
   or a Py3-specific, more advanced 
   :ref:`make-replacement`.
 
-  For more, check out :meth:`magicinvoke.skippable`. Very useful when
+  For API doc, check out :meth:`magicinvoke.skippable`. Very useful when
       you won't want something as cryptic or platform-specific as Make and bash,
-      but you also want to use Python tools like matplotlib or numpy.
+      or you also want to use Python tools like matplotlib or numpy.
 
-  Also gives each task which is detected to write out to a file a ``clean``
-      and ``force_run`` parameter, which do what they say on the tin.
+  [Also gives each task which is detected to write out to a file a ``clean``
+      and ``force_run`` parameter, which do what they say on the tin.]
 
 * **Arbitrary task filtering!**
     Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
@@ -51,12 +55,11 @@ adds support for lots of goodies:
     written by @judy2k.
 
  
-
 * **Bugfixes**
 
   * Fix cryptic error when doing ``ctx.cd(pathlib.Path)`` (#454)
     
-  * Fix help documentation for mis-spelled variable names silently being ignored (#409)
+  * Fix help documentation for misspelled variable names silently being ignored (#409)
 
   * Fix help documentation with - instead of _ being silently being ignored (#398)
 

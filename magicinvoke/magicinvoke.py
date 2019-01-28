@@ -449,9 +449,6 @@ class FileFlagChecker(object):
     """
 
     def can_skip(self, ci):
-        if not ci.flags:
-            return SkipResult(True, "has no flags")
-
         self.care_about = _hash(
             "task={}\nflags={}".format(
                 ci.name,
@@ -462,6 +459,9 @@ class FileFlagChecker(object):
             )
         )
 
+        if not ci.flags:
+            return SkipResult(True, "has no flags")
+
         can_skip = True
         for output_path in ci.output_paths:
             if not output_path.exists():
@@ -469,7 +469,7 @@ class FileFlagChecker(object):
                     False, "output {!r} doesn't exist yet".format(output_path)
                 )
             # Assumes non-root, but if folder, still works!
-            last_called = self.get_flags_for_last_run(output_path)
+            last_called = self._file_path_for_path(output_path).read_text().strip()
             if last_called != self.care_about:
                 can_skip = False
         return SkipResult(
@@ -498,33 +498,16 @@ class FileFlagChecker(object):
 
         return p
 
-    def set_flags_for_last_run(self, output_path, call_params):
-        self._file_path_for_path(output_path).write_text(self.care_about)
-
-    def get_flags_for_last_run(self, output_path):
-        return self._file_path_for_path(output_path).read_text().strip()
-
     def clean(self, ci):
         for path in ci.output_paths:
             self._file_path_for_path(path).rm()
 
-    def after_run(self, ci, youngest_input):
+    def after_run(self, ci):
         """
         There could be a racy condition here if someone changes one of the output
         files between your function returning and us creating this file. But if
         that happens, why are you writing the file at all?
-
-        Note youngest input here is only the youngest input if all inputs and
-        outputs existed. It's just a random input file if there were any files
-        missing. Doesn't really matter; it gets the same age as _an_ input.
         """
-        if not ci.flags:
-            return  # There were no flags that could affect output.
-
-        if not youngest_input:
-            return  # There are no inputs or one was missing
-
-        # All files existed, let's write out the flags used to gen outputs
         for path in ci.output_paths:
             self._file_path_for_path(path).write_text(self.care_about)
 
@@ -618,11 +601,11 @@ def skippable(func, must_be=True, *args, **kwargs):
         # I tried pos_or_kwarg here to try to fix py2; no dice.
         sig = signature(func)
         myparams = collections.OrderedDict(sig.parameters)
-        myparams["clean"] = Parameter(
-            name="clean", kind=Parameter.KEYWORD_ONLY, default=False
+        myparams["_clean"] = Parameter(
+            name="_clean", kind=Parameter.KEYWORD_ONLY, default=False
         )
-        myparams["force_run"] = Parameter(
-            name="force_run", kind=Parameter.KEYWORD_ONLY, default=False
+        myparams["_force_run"] = Parameter(
+            name="_force_run", kind=Parameter.KEYWORD_ONLY, default=False
         )
         func.__signature__ = sig.replace(parameters=myparams.values())
 
@@ -634,8 +617,8 @@ SkipResult = collections.namedtuple("SkipResult", ["skippable", "reason"])
 
 def _skippable(func, *args, **kwargs):
     ci = CallInfo(func).bind(args, kwargs)
-    force_run = kwargs.pop("force_run", False)
-    clean = kwargs.pop("clean", False)
+    force_run = kwargs.pop("_force_run", False)
+    clean = kwargs.pop("_clean", False)
 
     debug(
         "for func {}, inputs: {} outputs: {}".format(
@@ -652,7 +635,7 @@ def _skippable(func, *args, **kwargs):
 
     # Future alternative could be DBFileChecker
     check_result = func.checker.can_skip(ci)
-    fs_result, youngest_input = _timestamp_differ(ci)
+    fs_result = _timestamp_differ(ci)
 
     failing_result = next(
         filterfalse(lambda x: x.skippable, (check_result, fs_result)), None
@@ -670,14 +653,14 @@ def _skippable(func, *args, **kwargs):
 
     result = func(*args, **kwargs)
 
-    func.checker.after_run(ci, youngest_input)
+    func.checker.after_run(ci)
 
     return result
 
 
 def _timestamp_differ(ci):
     res = timestamp_differ(ci.input_paths, ci.output_paths)
-    return SkipResult(res[0], res[2]), res[1]
+    return SkipResult(res[0], res[1])
 
 
 def timestamp_differ(input_filenames, output_filenames):
@@ -687,11 +670,10 @@ def timestamp_differ(input_filenames, output_filenames):
       [1] -- Path of youngest input.
       [2] -- Why we're able to skip (or not).
     """
-    # Always run things that don't produce a file or depend on files.
-    if not input_filenames or not output_filenames:
+    # Always run things that don't produce a file
+    if not output_filenames:
         return (
             False,
-            None,
             "has_inputs:{} has_outputs:{}".format(
                 bool(input_filenames), bool(output_filenames)
             ),
@@ -705,7 +687,9 @@ def timestamp_differ(input_filenames, output_filenames):
     for p in paths:
         if not Path(p).exists():
             # HACK Not the youngest input, but it currently doesn't matter
-            return False, input_filenames[0], "{} missing".format(p)
+            return False, "{} missing".format(p)
+    if not input_filenames:
+        return True, "task's outputs exist, but no inputs required"
 
     # All exist, now make sure oldest output is older than youngest input.
     PathInfo = collections.namedtuple("PathInfo", ["path", "modified"])
@@ -719,7 +703,6 @@ def timestamp_differ(input_filenames, output_filenames):
     skipping = youngest_input.modified < oldest_output.modified
     return (
         skipping,
-        youngest_input.path,
         "youngest_input={}, oldest_output={}".format(
             youngest_input, oldest_output
         ),
