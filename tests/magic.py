@@ -1,5 +1,6 @@
 from magicinvoke import magictask, task
 from invoke import Context, Config
+import six
 
 import pytest
 
@@ -107,7 +108,7 @@ def call_calls_pres():
     "folder, cmd, expected_output, py2_only",
     [
         ("args-kwargs", "invoke myfunc x --z 1", "('x',) {'z': '1'}\n", False),
-        ("data-pipeline", "invoke test", "We're good!", True),
+        ("data-pipeline", "pytest --capture=no -k test_this", "We're good!", True),
         ("make-replacement", "invoke test", "All tests succeeded.", True),
         ("skip-if", "invoke mytask", "Didn't skip!", False),
     ],
@@ -115,6 +116,7 @@ def call_calls_pres():
 def test_full_integration(folder, cmd, expected_output, py2_only, tmpdir):
     # --durations=10, you will see each one gets run twice, maybe fix?
     ctx = Context()
+    assert ctx.pformat()
     with ctx.cd("sites/magic_docs/examples/{}".format(folder)):
         result = ctx.run(
             "TMPDIR={} {}".format(tmpdir, cmd), hide=True, warn=py2_only
@@ -122,6 +124,6 @@ def test_full_integration(folder, cmd, expected_output, py2_only, tmpdir):
         try:
             assert expected_output in result
         except:
-            if py2_only:
+            if py2_only and six.PY2:
                 pytest.xfail("We knew that.")
             raise

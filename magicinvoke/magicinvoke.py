@@ -5,6 +5,7 @@ import functools
 import hashlib
 import itertools
 import logging
+import pickle
 
 try:
     from pathlib import Path  # Py3
@@ -19,6 +20,7 @@ from invoke.tasks import Task
 from invoke.vendor.decorator import decorate
 
 import cachepath  # noqa Add .rm to Paths
+from cachepath import CachePath
 
 
 def enable_logging(disable_invoke_logging=True):
@@ -160,15 +162,15 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     'ctx.another_level.xyz.myfuncnameargs' is a valid value for the path.
 
     Secret way: If your default is a callable (which doesn't mean anything
-    for most Invoke tasks), we will call it with ctx. That is::
+    for most Invoke tasks), we will call it with ctx. This is how
+    :meth:`invoke.config.Lazy` works under the hood.
+    That is::
 
         @get_params_from_ctx(path='ctx.myfuncname')
         def myfuncname(ctx, requiredparam1,
             namedparam1=lambda ctx: ctx.othertask.controlflag):
             print(requiredparam1, namedparam1)
 
-    You can also provide a function for derive_kwargs, which augments
-    the user passed kwargs.
 
     .. versionadded:: 0.1
     """
@@ -319,15 +321,13 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
 InputPath = "input"
 OutputPath = "output"
-Skipped = "Skipped because output files newer than all input files."
 
 
-def _hash(obj):
-    if os.getenv("MAGICINVOKE_PLAINTEXT_ARGS"):
-        s = obj
-        return s
-    return hashlib.sha224(obj.encode("utf-8")).hexdigest()
+def _hash_str(obj):
+    return hashlib.sha224(str(obj).encode("utf-8")).hexdigest()
 
+def _hash_int(obj):
+    return int(_hash_str(obj), 16)
 
 class CallInfo(object):
     def __init__(self, func):
@@ -342,14 +342,6 @@ class CallInfo(object):
             InputPath, [str(InputPath), "path", "file"]
         )
 
-    def maybe_throw_if_no_outputs(self, throw):
-        if throw and len(self._params_not_ctx) == 0:
-            raise ValueError(
-                "{!r} shouldn't be a @skippable task, it has no in/out parameters!".format(
-                    self.name
-                )
-            )
-
     def bind(self, args, kwargs):
         # bind here to throw error for too many arguments...
         ba = self.sig.bind(*args, **kwargs)
@@ -358,6 +350,7 @@ class CallInfo(object):
         for param in self.sig.parameters.values():
             if param.name not in ba.arguments:
                 ba.arguments[param.name] = param.default
+
         self.flags = [
             (param_name, argument_value)
             for param_name, argument_value in self.ba.arguments.items()
@@ -381,6 +374,12 @@ class CallInfo(object):
             if list(self.sig.parameters.keys())[0] in ["c", "ctx"]
             else self.sig.parameters.keys()
         )
+
+    def identify(self):
+        return [self.name, self.input_paths, self.output_paths, self.flags]
+
+    def __hash__(self):
+        return sum(_hash_int(x) for x in self.identify())
 
     @property
     def _params_not_ctx(self):
@@ -437,6 +436,7 @@ class CallInfo(object):
                 annotation
                 and annotation is type_annotation
                 or any(w in param_name.lower() for w in words_to_match)
+                and not param_name.startswith('_')
             ) and param_name not in self.params_that_are_filenames:
                 self.params_that_are_filenames.append(param_name)
                 returning.append(param_name)
@@ -449,7 +449,7 @@ class FileFlagChecker(object):
     """
 
     def can_skip(self, ci):
-        self.care_about = _hash(
+        self.care_about = _hash_str(
             "task={}\nflags={}".format(
                 ci.name,
                 ", ".join(
@@ -459,22 +459,27 @@ class FileFlagChecker(object):
             )
         )
 
+        self.last_result_path = CachePath('.minv', ci.name, str(hash(ci)))
+        ci.output_paths.append(self.last_result_path)
+
         if not ci.flags:
             return SkipResult(True, "has no flags")
 
-        can_skip = True
+        failed_path = None
         for output_path in ci.output_paths:
             if not output_path.exists():
                 return SkipResult(
                     False, "output {!r} doesn't exist yet".format(output_path)
                 )
             # Assumes non-root, but if folder, still works!
-            last_called = self._file_path_for_path(output_path).read_text().strip()
-            if last_called != self.care_about:
-                can_skip = False
+            last_called_path = self._file_path_for_path(output_path)
+            if last_called_path.exists() and last_called_path.read_bytes().strip() != self.care_about:
+                different_path = output_path
+        can_skip = not failed_path
         return SkipResult(
             can_skip,
-            "files were last generated with {} flags".format(
+            "{} last generated with {} flags".format(
+                failed_path + " was" if failed_path else "no files were",
                 "same" if can_skip else "different"
             ),
         )
@@ -489,18 +494,14 @@ class FileFlagChecker(object):
         We go with 2 here because 1 felt too magic, didn't allow absolute vs
         rel paths, wasn't visible to user.
         """
-        # 1. p = CachePath('minv', path), skip the p.parent.mkdir
-        # 2:
         p = Path(path.parent, ".minv", path.name)
         p.parent.mkdir(exist_ok=True)
-        if not p.exists():
-            p.touch()
-
         return p
 
     def clean(self, ci):
         for path in ci.output_paths:
             self._file_path_for_path(path).rm()
+        CachePath('.minv', ci.name).rm()
 
     def after_run(self, ci):
         """
@@ -509,10 +510,17 @@ class FileFlagChecker(object):
         that happens, why are you writing the file at all?
         """
         for path in ci.output_paths:
+            debug("Logging flags to {!r}".format(path))
             self._file_path_for_path(path).write_text(self.care_about)
+        pickle.dump(ci.result, self.last_result_path.open("wb"))
+        debug("Done logging {} to {}".format(ci.result, self.last_result_path))
+
+    def load(self, ci):
+        debug("Loading return value for {!r} from {!r}".format(ci.name, self.last_result_path))
+        return pickle.load(self.last_result_path.open("rb"))
 
 
-def skippable(func, must_be=True, *args, **kwargs):
+def skippable(func, *args, **kwargs):
     """
     Decorator to skip function if input files are older than output files.
 
@@ -591,23 +599,21 @@ def skippable(func, must_be=True, *args, **kwargs):
     # Make sure it has in and out parameters,
     # get some helpful info like output_params
     ci = CallInfo(func)
-    ci.maybe_throw_if_no_outputs(must_be)
     output_params = ci.output_params
 
     func.checker = FileFlagChecker()
 
     # Convince invoke to pass us --clean and --force-run flags
-    if output_params:
-        # I tried pos_or_kwarg here to try to fix py2; no dice.
-        sig = signature(func)
-        myparams = collections.OrderedDict(sig.parameters)
-        myparams["_clean"] = Parameter(
-            name="_clean", kind=Parameter.KEYWORD_ONLY, default=False
-        )
-        myparams["_force_run"] = Parameter(
-            name="_force_run", kind=Parameter.KEYWORD_ONLY, default=False
-        )
-        func.__signature__ = sig.replace(parameters=myparams.values())
+    # I tried pos_or_kwarg here to try to fix py2; no dice.
+    sig = signature(func)
+    myparams = collections.OrderedDict(sig.parameters)
+    myparams["_clean"] = Parameter(
+        name="_clean", kind=Parameter.KEYWORD_ONLY, default=False
+    )
+    myparams["_force_run"] = Parameter(
+        name="_force_run", kind=Parameter.KEYWORD_ONLY, default=False
+    )
+    func.__signature__ = sig.replace(parameters=myparams.values())
 
     return decorate(func, _skippable)
 
@@ -620,11 +626,6 @@ def _skippable(func, *args, **kwargs):
     force_run = kwargs.pop("_force_run", False)
     clean = kwargs.pop("_clean", False)
 
-    debug(
-        "for func {}, inputs: {} outputs: {}".format(
-            ci.name, ci.input_paths, ci.output_paths
-        )
-    )
     if clean:
         debug("Cleaning {!r}: {!r}!".format(ci.name, ci.output_paths))
         for p in ci.output_paths:
@@ -635,6 +636,11 @@ def _skippable(func, *args, **kwargs):
 
     # Future alternative could be DBFileChecker
     check_result = func.checker.can_skip(ci)
+    debug(
+        "for func {}, inputs: {} outputs: {}".format(
+            ci.name, ci.input_paths, ci.output_paths
+        )
+    )
     fs_result = _timestamp_differ(ci)
 
     failing_result = next(
@@ -644,18 +650,20 @@ def _skippable(func, *args, **kwargs):
     result = failing_result if failing_result is not None else fs_result
     debug(
         "{}skipping {} because {}".format(
-            "not " if not result else "", func.__name__, result.reason
+            "not " if not result.skippable else "", func.__name__, result.reason
         )
     )
 
     if result.skippable and not force_run:
-        return Skipped
+        try:
+            return func.checker.load(ci)
+        except Exception as e:
+            debug(e)
 
-    result = func(*args, **kwargs)
-
+    ci.result = func(*args, **kwargs)
     func.checker.after_run(ci)
 
-    return result
+    return ci.result
 
 
 def _timestamp_differ(ci):
@@ -782,27 +790,36 @@ def magictask(*args, **kwargs):
     # Shamelessly stolen from `invoke.task` :)
     klass = kwargs.pop("klass", Task)
     collection = kwargs.pop("collection", None)
+    _skippable = kwargs.pop("skippable", False)
     get_params_args = {
         arg: kwargs.pop(arg, None) for arg in ("params_from", "derive_kwargs")
     }
     get_params_args["path"] = get_params_args.pop("params_from", None)
+
     # @task -- no options were (probably) given.
     if len(args) == 1 and callable(args[0]) and not isinstance(args[0], Task):
-        t = klass(
-            get_params_from_ctx(skippable(args[0], must_be=False)), **kwargs
-        )
+        if _skippable:
+            t = klass(
+                get_params_from_ctx(skippable(args[0])), **kwargs
+            )
+        else:
+            t = klass(
+                get_params_from_ctx(args[0]), **kwargs
+            )
         if collection is not None:
             collection.add_task(t)
         return t
+
     # @task(options)
     def inner(inner_obj):
-        obj = klass(
-            get_params_from_ctx(
-                skippable(inner_obj, must_be=False), **get_params_args
-            ),
-            # Pass in any remaining kwargs as-is.
-            **kwargs
-        )
+        if _skippable:
+            obj = klass(
+                get_params_from_ctx(skippable(inner_obj), **get_params_args),
+                **kwargs
+            )
+        else:
+            obj = klass(get_params_from_ctx(inner_obj, **get_params_args), **kwargs)
+
         if collection is not None:
             collection.add_task(obj)
         return obj

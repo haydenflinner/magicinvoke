@@ -12,7 +12,6 @@ from .magicinvoke import (
     InputPath,
     Lazy,
     OutputPath,
-    Skipped,
 )
 
 # Things that are handy for everyone to have
@@ -35,7 +34,6 @@ __all__ = [
     "InputPath",
     "Lazy",
     "OutputPath",
-    "Skipped",
     "dotdict",
     "__colored_traceback",
     "Path",

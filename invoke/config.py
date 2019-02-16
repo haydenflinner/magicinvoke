@@ -3,6 +3,7 @@ import json
 import os
 import types
 from os.path import join, splitext, expanduser
+from pprint import pformat
 
 from .util import signature, six, yaml
 
@@ -176,15 +177,17 @@ class DataProxy(object):
             raise AttributeError(key)
         # At this point we should be able to assume a self._config...
         value = self._config[key]
+
+        # If we have no _root, we must be the root, so it's us. Otherwise,
+        # pass along our handle on the root.
+        root = getattr(self, "_root", self)
+
         if isinstance(value, dict):
             # New object's keypath is simply the key, prepended with our own
             # keypath if we've got one.
             keypath = (key,)
             if hasattr(self, "_keypath"):
                 keypath = self._keypath + keypath
-            # If we have no _root, we must be the root, so it's us. Otherwise,
-            # pass along our handle on the root.
-            root = getattr(self, "_root", self)
             value = DataProxy.from_data(data=value, root=root, keypath=keypath)
 
         if callable(value) and (
@@ -203,7 +206,7 @@ class DataProxy(object):
                     "Can't have callable in ctx that can't be called with ctx to get value lazily."
                     " Please come discuss if you'd prefer silently returning the callable."
                 )
-            value = value(self)
+            value = value(root)
 
         return value
 
@@ -226,6 +229,16 @@ class DataProxy(object):
 
     def __repr__(self):
         return "<{}: {}>".format(self.__class__.__name__, self._config)
+
+    def _as_dict(self):
+        working = {}
+        for key in self.keys():
+            working[key] = self.get(key)
+        return working
+
+    def pformat(self, indent=2, width=120, depth=None):
+        return pformat(self._as_dict(), indent=indent, width=width, depth=depth)
+
 
     def __contains__(self, key):
         return key in self._config
@@ -1342,6 +1355,9 @@ class Lazy(object):
             "ctx.", "c."
         )  # Allow both c. and ctx., but nothing else.
         self.path = path
+
+    def __repr__(self):
+        return "Lazy({!r})".format(self.path)
 
     def __call__(self, c):
         return eval(self.path)

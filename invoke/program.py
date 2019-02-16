@@ -52,6 +52,7 @@ class Program(object):
                 default="",
                 help="Print the tab-completion script for your preferred shell (bash|zsh|fish).",  # noqa
             ),
+            # TODO should probably add a --clean and --force-run here.
             Argument(
                 names=("define", "D"),
                 kind=list,

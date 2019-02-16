@@ -12,7 +12,7 @@ from magicinvoke import (
 """Yes, I'm aware that this should not be used as a build tool :)"""
 
 
-@magictask(params_from="ctx.mycompileinfo")
+@magictask(params_from="ctx.mycompileinfo", skippable=True)
 def write_all_the_programs(
     ctx, cfiles, executable_cfile=Lazy("ctx.mycompileinfo.cfiles[0]")
 ):
@@ -21,14 +21,14 @@ def write_all_the_programs(
     ctx.run("touch " + " ".join(str(x) for x in cfiles))
 
 
-@magictask(params_from="ctx.mycompileinfo")
+@magictask(params_from="ctx.mycompileinfo", skippable=True)
 def mycompile(ctx, cfiles, objectfiles: [OutputPath]):
     """Then compile them"""
     for c, o in zip(cfiles, objectfiles):
         ctx.run("gcc -c {} -o {}".format(c, o))
 
 
-@magictask(params_from="ctx.mycompileinfo", pre=[mycompile])
+@magictask(params_from="ctx.mycompileinfo", pre=[mycompile], skippable=True)
 def link(ctx, objectfiles: [InputPath], executable_path: OutputPath):
     """Now we link them into our final executable..."""
     ctx.run(
@@ -38,7 +38,7 @@ def link(ctx, objectfiles: [InputPath], executable_path: OutputPath):
     )
 
 
-@magictask(params_from="ctx.mycompileinfo", pre=[link])
+@magictask(params_from="ctx.mycompileinfo", pre=[link], skippable=True)
 def run(ctx, executable_path: InputPath):
     """And finally run the executable, exiting with exitcode=255."""
     # Calling link(ctx) here would would work just as well as pre=[link], but

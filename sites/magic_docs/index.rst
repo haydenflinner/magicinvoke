@@ -11,21 +11,19 @@ adds support for lots of goodies:
 * **Program.invoke, thanks @rectalogic!** Example usage::
 
     @task
-    def mytask(c, recursed=False):
-      program.invoke(c, "mytask", recursed=True)
+    def infinite_recursing_task(c, recursed=False):
+      program.invoke(c, "infinite-recursing-task", recursed=True)
 
   `Longer explanation here. <https://github.com/pyinvoke/invoke/pull/613>`_
 
 
-
-* **Automatic ctx->parameter expansion!**
+* **Automatic filling of parameters from ctx!**
   Have you ever wondered why you can put ``'run': {'echo': True}`` in
   ``invoke.yaml`` and suddenly ``echo=True`` gets passed to all
   ``ctx.run()``s, but you **can't do the same for your own tasks?**
 
   Wonder no longer with :meth:`magicinvoke.get_params_from_ctx`! Here's how you
-  would implement a task like ctx.run (note that ``params_from`` is only needed
-  to be explicit; it defaults to ``task.name``)::
+  would implement a task like ctx.run::
 
       @magictask(params_from='ctx.myrun')
       def myrun(ctx, cmd, echo=False):
@@ -37,22 +35,23 @@ adds support for lots of goodies:
   or a Py3-specific, more advanced 
   :ref:`make-replacement`.
 
-  For API doc, check out :meth:`magicinvoke.skippable`. Very useful when
-      you won't want something as cryptic or platform-specific as Make and bash,
-      or you also want to use Python tools like matplotlib or numpy.
-
-  [Also gives each task which is detected to write out to a file a ``clean``
-      and ``force_run`` parameter, which do what they say on the tin.]
+  Useful when
+      you don't want something as cryptic or platform-specific as Make and bash,
+      or you also want to use Python tools like matplotlib or numpy. For API
+      doc, check out :meth:`magicinvoke.skippable`. 
 
 * **Arbitrary task filtering!**
     Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
     `from this issue
-    <https://github.com/pyinvoke/invoke/issues/461>`_
+    <https://github.com/pyinvoke/invoke/issues/461>`_. Basically, you can
+    add your own functions that decide whether or not your task should run.
 
 * **Single-step namespaced tasks!**
     Merges the very helpful
     `patch <https://github.com/pyinvoke/invoke/pull/527#issue-189000872>`_
-    written by @judy2k.
+    written by @judy2k. No longer need to manually add each function to the
+    current namespace, resulting in less code being written, and it's
+    code that's easier to get right.
 
  
 * **Bugfixes**
@@ -74,11 +73,13 @@ Jump In
 --------
 ``pip uninstall -y invoke; pip install magicinvoke``
 
-**Beginner's Note** 
+**Invoke Beginner's Note** 
 `Invoke's documentation <http://pyinvoke.org>`_ is the best place to start,
 as the majority of using this library is just like using regular ``invoke``.
 However, you should still install ``pip install magicinvoke`` to get the
 improved error messages while you learn.
+
+**MagicInvoke**
 
 .. toctree::
     :maxdepth: 2
