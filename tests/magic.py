@@ -108,7 +108,12 @@ def call_calls_pres():
     "folder, cmd, expected_output, py2_only",
     [
         ("args-kwargs", "invoke myfunc x --z 1", "('x',) {'z': '1'}\n", False),
-        ("data-pipeline", "pytest --capture=no -k test_this", "We're good!", False),
+        (
+            "data-pipeline",
+            "pytest --capture=no -k test_this",
+            "We're good!",
+            False,
+        ),
         ("make-replacement", "invoke test", "All tests succeeded.", True),
         ("skip-if", "invoke mytask", "Didn't skip!", False),
     ],

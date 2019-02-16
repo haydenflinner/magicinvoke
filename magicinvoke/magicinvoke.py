@@ -326,8 +326,10 @@ OutputPath = "output"
 def _hash_str(obj):
     return hashlib.sha224(str(obj).encode("utf-8")).hexdigest()
 
+
 def _hash_int(obj):
     return int(_hash_str(obj), 16)
+
 
 class CallInfo(object):
     def __init__(self, func):
@@ -436,7 +438,7 @@ class CallInfo(object):
                 annotation
                 and annotation is type_annotation
                 or any(w in param_name.lower() for w in words_to_match)
-                and not param_name.startswith('_')
+                and not param_name.startswith("_")
             ) and param_name not in self.params_that_are_filenames:
                 self.params_that_are_filenames.append(param_name)
                 returning.append(param_name)
@@ -459,7 +461,7 @@ class FileFlagChecker(object):
             )
         )
 
-        self.last_result_path = CachePath('.minv', ci.name, str(hash(ci)))
+        self.last_result_path = CachePath(".minv", ci.name, str(hash(ci)))
         ci.output_paths.append(self.last_result_path)
 
         if not ci.flags:
@@ -472,15 +474,18 @@ class FileFlagChecker(object):
                     False, "output {!r} doesn't exist yet".format(output_path)
                 )
             # Assumes non-root, but if folder, still works!
-            last_called_path = self._file_path_for_path(output_path)
-            if last_called_path.exists() and last_called_path.read_bytes().decode() != self.care_about:
+            flags_path = self._file_path_for_path(output_path)
+            if (
+                flags_path.exists()
+                and flags_path.read_bytes().decode() != self.care_about
+            ):
                 failed_path = output_path
         can_skip = not failed_path
         return SkipResult(
             can_skip,
             "{} last generated with {} flags".format(
                 ("%s was" % failed_path) if failed_path else "no files were",
-                "same" if can_skip else "different"
+                "same" if can_skip else "different",
             ),
         )
 
@@ -501,7 +506,7 @@ class FileFlagChecker(object):
     def clean(self, ci):
         for path in ci.output_paths:
             self._file_path_for_path(path).rm()
-        CachePath('.minv', ci.name).rm()
+        CachePath(".minv", ci.name).rm()
 
     def after_run(self, ci):
         """
@@ -511,12 +516,18 @@ class FileFlagChecker(object):
         """
         for path in ci.output_paths:
             debug("Logging flags to {!r}".format(path))
-            self._file_path_for_path(path).write_bytes(self.care_about.encode())
+            self._file_path_for_path(path).write_bytes(
+                self.care_about.encode()
+            )
         pickle.dump(ci.result, self.last_result_path.open("wb"))
         debug("Done logging {} to {}".format(ci.result, self.last_result_path))
 
     def load(self, ci):
-        debug("Loading return value for {!r} from {!r}".format(ci.name, self.last_result_path))
+        debug(
+            "Loading return value for {!r} from {!r}".format(
+                ci.name, self.last_result_path
+            )
+        )
         return pickle.load(self.last_result_path.open("rb"))
 
 
@@ -646,7 +657,9 @@ def _skippable(func, *args, **kwargs):
     result = failing_result if failing_result is not None else fs_result
     debug(
         "{}skipping {} because {}".format(
-            "not " if not result.skippable else "", func.__name__, result.reason
+            "not " if not result.skippable else "",
+            func.__name__,
+            result.reason,
         )
     )
 
@@ -795,13 +808,9 @@ def magictask(*args, **kwargs):
     # @task -- no options were (probably) given.
     if len(args) == 1 and callable(args[0]) and not isinstance(args[0], Task):
         if _skippable:
-            t = klass(
-                get_params_from_ctx(skippable(args[0])), **kwargs
-            )
+            t = klass(get_params_from_ctx(skippable(args[0])), **kwargs)
         else:
-            t = klass(
-                get_params_from_ctx(args[0]), **kwargs
-            )
+            t = klass(get_params_from_ctx(args[0]), **kwargs)
         if collection is not None:
             collection.add_task(t)
         return t
@@ -814,7 +823,9 @@ def magictask(*args, **kwargs):
                 **kwargs
             )
         else:
-            obj = klass(get_params_from_ctx(inner_obj, **get_params_args), **kwargs)
+            obj = klass(
+                get_params_from_ctx(inner_obj, **get_params_args), **kwargs
+            )
 
         if collection is not None:
             collection.add_task(obj)

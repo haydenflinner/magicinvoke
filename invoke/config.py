@@ -237,8 +237,9 @@ class DataProxy(object):
         return working
 
     def pformat(self, indent=2, width=120, depth=None):
-        return pformat(self._as_dict(), indent=indent, width=width, depth=depth)
-
+        return pformat(
+            self._as_dict(), indent=indent, width=width, depth=depth
+        )
 
     def __contains__(self, key):
         return key in self._config
