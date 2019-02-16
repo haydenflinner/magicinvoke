@@ -1,4 +1,6 @@
-import pytest
+import pytest, six
+from cachepath import CachePath, Path
+
 @pytest.fixture
 def ctx():
     from invoke import Context
@@ -7,6 +9,7 @@ def ctx():
 # pytest -k test_this --capture=no
 
 def test_this(ctx):
+    # Includes workarounds for --clean and --force-run not working in PY2.
     from textwrap import dedent
     from colorama import Style
     only_print_expected_stdout = dedent(
@@ -39,13 +42,22 @@ def test_this(ctx):
     def both_ran(stdout):
         assert both_stdout.strip() == stdout.strip()
 
-    assert "cleaned all" in ctx.run("inv get-peoples-ages --clean").stdout.lower()
+    if six.PY2:
+        CachePath('.minv').rm()
+        Path('.minv').rm()
+    else:
+        assert "cleaned all" in ctx.run("inv get-peoples-ages --clean").stdout.lower()
 
     def bprint(s):
         print(Style.BRIGHT + s + Style.RESET_ALL)
 
     bprint("Everything should run from scratch.")
-    assert "Wrote" in ctx.run("inv get-people --force-run").stdout.strip()
+    if six.PY2:
+        Path('people.txt').rm()
+        assert "Wrote" in ctx.run("invoke get-people").stdout
+    else:
+        assert "Wrote" in ctx.run("inv get-people --force-run").stdout.strip()
+
     both_ran(ctx.run("invoke print-peoples-ages").stdout)
     only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
 
@@ -65,7 +77,10 @@ def test_this(ctx):
     only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
 
     bprint("Make sure clean actually cleans.")
-    ctx.run("invoke get-peoples-ages --clean")
+    if six.PY2:
+        CachePath('.minv', 'get_peoples_ages').rm()
+    else:
+        ctx.run("invoke get-peoples-ages --clean")
     both_ran(ctx.run("invoke print-peoples-ages").stdout)
 
     bprint("We're good!")

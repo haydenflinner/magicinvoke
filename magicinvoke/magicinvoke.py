@@ -511,7 +511,7 @@ class FileFlagChecker(object):
         """
         for path in ci.output_paths:
             debug("Logging flags to {!r}".format(path))
-            self._file_path_for_path(path).write_text(self.care_about)
+            self._file_path_for_path(path).write_bytes(self.care_about)
         pickle.dump(ci.result, self.last_result_path.open("wb"))
         debug("Done logging {} to {}".format(ci.result, self.last_result_path))
 
