@@ -473,13 +473,13 @@ class FileFlagChecker(object):
                 )
             # Assumes non-root, but if folder, still works!
             last_called_path = self._file_path_for_path(output_path)
-            if last_called_path.exists() and last_called_path.read_bytes().strip() != self.care_about:
-                different_path = output_path
+            if last_called_path.exists() and last_called_path.read_bytes().decode() != self.care_about:
+                failed_path = output_path
         can_skip = not failed_path
         return SkipResult(
             can_skip,
             "{} last generated with {} flags".format(
-                failed_path + " was" if failed_path else "no files were",
+                ("%s was" % failed_path) if failed_path else "no files were",
                 "same" if can_skip else "different"
             ),
         )
@@ -511,7 +511,7 @@ class FileFlagChecker(object):
         """
         for path in ci.output_paths:
             debug("Logging flags to {!r}".format(path))
-            self._file_path_for_path(path).write_bytes(self.care_about)
+            self._file_path_for_path(path).write_bytes(self.care_about.encode())
         pickle.dump(ci.result, self.last_result_path.open("wb"))
         debug("Done logging {} to {}".format(ci.result, self.last_result_path))
 
@@ -595,12 +595,8 @@ def skippable(func, *args, **kwargs):
       Last_Ran with these parameters must be newer than input_filenames
       Fresh last_ran per set of parameters. Database?
     """
-
     # Make sure it has in and out parameters,
     # get some helpful info like output_params
-    ci = CallInfo(func)
-    output_params = ci.output_params
-
     func.checker = FileFlagChecker()
 
     # Convince invoke to pass us --clean and --force-run flags

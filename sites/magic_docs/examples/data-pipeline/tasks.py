@@ -14,7 +14,7 @@ Two types of skippable tasks are demonstrated here:
 @ns.magictask(skippable=True)
 def get_people(ctx, names_output_path=Lazy("ctx.people.names_path")):
     print("get_people called")
-    Path(names_output_path).write_bytes("Tom\nJerry\nBill Nye\n")
+    Path(names_output_path).write_text(u"Tom\nJerry\nBill Nye\n")
     print("Wrote {}".format(names_output_path))
 
 
