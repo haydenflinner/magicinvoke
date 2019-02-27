@@ -51,10 +51,11 @@ class DataProxy(object):
     """
 
     # Attributes which get proxied through to inner merged-dict config obj.
+    # NOTE: These won't have their callables called. I've never used these
+    # functions, so didn't put in work to add.
     _proxies = (
         tuple(
             """
-        get
         has_key
         items
         iteritems
@@ -169,7 +170,33 @@ class DataProxy(object):
     def __getitem__(self, key):
         return self._get(key)
 
-    def _get(self, key):
+    def get(self, key, default=None, call=True):
+        val = default
+        try:
+            val = self._get(key, call=call)
+        except KeyError:
+            pass
+        return val
+
+    def _call_if_lazy(self, value):
+        if isinstance(value, Lazy) or isinstance(value, type(lambda: None)):
+            # Stupid isinstance needed to let Mocks pass through unscathed :(
+            # Try binding first, then actually call it.
+            try:
+                signature(value).bind(value)
+            except TypeError:
+                # User has a callable in ctx that isn't cooperating. Should we let them do that?
+                # For now, we'll raise and wait for someone to complain about the behavior.
+                raise ValueError(
+                    "Can't have callable in ctx that can't be called with ctx to get value lazily."
+                    " Please come discuss if you'd prefer silently returning the callable."
+                )
+            root = getattr(self, "_root", self)
+            value = value(root)
+
+        return value
+
+    def _get(self, key, call=True):
         # Short-circuit if pickling/copying mechanisms are asking if we've got
         # __setstate__ etc; they'll ask this w/o calling our __init__ first, so
         # we'd be in a RecursionError-causing catch-22 otherwise.
@@ -190,25 +217,7 @@ class DataProxy(object):
                 keypath = self._keypath + keypath
             value = DataProxy.from_data(data=value, root=root, keypath=keypath)
 
-        if callable(value) and (
-            isinstance(value, Lazy)
-            or
-            # Stupid isinstance needed to let Mocks pass through unscathed :(
-            isinstance(value, type(lambda: None))
-        ):
-            # Try binding first, then actually call it.
-            try:
-                signature(value).bind(value)
-            except TypeError:
-                # User has a callable in ctx that isn't cooperating. Should we let them do that?
-                # For now, we'll raise and wait for someone to complain about the behavior.
-                raise ValueError(
-                    "Can't have callable in ctx that can't be called with ctx to get value lazily."
-                    " Please come discuss if you'd prefer silently returning the callable."
-                )
-            value = value(root)
-
-        return value
+        return self._call_if_lazy(value) if call else value
 
     def _set(self, *args, **kwargs):
         """

@@ -234,7 +234,7 @@ No attribute or config key found for 'nope'
 
 Valid keys: ['run', 'runners', 'sudo', 'tasks']
 
-Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_data', 'global_defaults', 'load_base_conf_files', 'load_collection', 'load_defaults', 'load_overrides', 'load_project', 'load_runtime', 'load_shell_env', 'load_system', 'load_user', 'merge', 'pformat', 'pop', 'popitem', 'prefix', 'set_project_location', 'set_runtime_path', 'setdefault', 'update']
+Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_data', 'get', 'global_defaults', 'load_base_conf_files', 'load_collection', 'load_defaults', 'load_overrides', 'load_project', 'load_runtime', 'load_shell_env', 'load_system', 'load_user', 'merge', 'pformat', 'pop', 'popitem', 'prefix', 'set_project_location', 'set_runtime_path', 'setdefault', 'update']
 """.strip()  # noqa
                 assert str(e) == expected
             else:
@@ -270,6 +270,26 @@ Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_dat
             assert list(six.iteritems(c)) == [("foo", "bar")]
             assert list(c.keys()) == ["foo"]
             assert list(c.values()) == ["bar"]
+
+            # magicinvoke callable tests
+            alias = lambda ctx: ctx.B
+            bval = 2
+            c3 = Config(defaults={"A": {"num": 1}, "B": bval})
+            c3.A.myalias = alias
+
+            assert c3.A.myalias == bval
+            assert c3["A"]["myalias"] == bval
+
+            # More advanced traversal tests
+            assert c3.get("A").get("myalias", call=False) is alias
+            c3.A.loop = lambda ctx: ctx.A
+            c3.A.loop.loop.get("loop")["loop"] == c3.A
+            c3.A.get("loop", call=False)(c3) == c3.A
+
+            from magicinvoke import Lazy
+
+            c3.A.num = Lazy("ctx.B")
+            assert c3.A.num == c3.B
 
         class runtime_loading_of_defaults_and_overrides:
             def defaults_can_be_given_via_method(self):
