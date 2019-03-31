@@ -178,19 +178,20 @@ class DataProxy(object):
             pass
         return val
 
-    def _call_if_lazy(self, value):
+    def _call_if_lazy(self, value, key="key"):
         if isinstance(value, Lazy) or isinstance(value, type(lambda: None)):
             # Stupid isinstance needed to let Mocks pass through unscathed :(
             # Try binding first, then actually call it.
             try:
                 signature(value).bind(value)
-            except TypeError:
+            except TypeError as e:
                 # User has a callable in ctx that isn't cooperating. Should we let them do that?
-                # For now, we'll raise and wait for someone to complain about the behavior.
-                raise ValueError(
-                    "Can't have callable in ctx that can't be called with ctx to get value lazily."
-                    " Please come discuss if you'd prefer silently returning the callable."
+                debug(
+                    "Skipping calling value at {!r}: {!r} because of {!r}".format(
+                        key, value, e
+                    )
                 )
+                return value
             root = getattr(self, "_root", self)
             value = value(root)
 
@@ -217,7 +218,7 @@ class DataProxy(object):
                 keypath = self._keypath + keypath
             value = DataProxy.from_data(data=value, root=root, keypath=keypath)
 
-        return self._call_if_lazy(value) if call else value
+        return self._call_if_lazy(value, key=key) if call else value
 
     def _set(self, *args, **kwargs):
         """

@@ -6,6 +6,7 @@ import hashlib
 import itertools
 import logging
 import pickle
+from textwrap import dedent
 
 try:
     from pathlib import Path  # Py3
@@ -37,6 +38,9 @@ log = logging.getLogger("magicinvoke")
 debug = "dummy"  # noqa
 for x in ("debug",):
     globals()[x] = getattr(log, x)
+
+if os.getenv("MAGICINVOKE_TEST_DEBUG"):
+    globals()["debug"] = print
 
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
@@ -332,8 +336,11 @@ def _hash_int(obj):
 
 
 class CallInfo(object):
+    def __repr__(self):
+        return "CallInfo({!r})".format(self.name)
+
     def __init__(self, func):
-        self.name = func.__name__
+        self.name = getattr(func, "__qualname__", func.__name__)
         sig = signature(func)
         self.sig = sig
         self.params_that_are_filenames = []
@@ -342,6 +349,25 @@ class CallInfo(object):
         )
         self.input_params = self._look_for_params_with(
             InputPath, [str(InputPath), "path", "file"]
+        )
+        self.params_modify_behavior = [
+            param_name
+            for param_name in self.sig.parameters
+            if not param_name.startswith("_")
+            and param_name not in ["c", "ctx"]
+            and param_name not in self.output_params
+            and param_name not in self.input_params
+        ]
+        debug(
+            "For func {!r}, detected signature: "
+            "input_params: {!r}, "
+            "output_params: {!r}, "
+            "params_modify_behavior: {!r}".format(
+                self.name,
+                self.input_params,
+                self.output_params,
+                self.params_modify_behavior,
+            )
         )
 
     def bind(self, args, kwargs):
@@ -356,26 +382,12 @@ class CallInfo(object):
         self.flags = [
             (param_name, argument_value)
             for param_name, argument_value in self.ba.arguments.items()
-            if not param_name.startswith("_")
-            and param_name not in ["c", "ctx"]
-            and param_name not in self.output_params
-            and param_name not in self.input_params
+            if param_name in self.params_modify_behavior
         ]
         # Input_paths gets mutated later!
         self.output_paths = self._coerce_paths(self.output_params)
         self.input_paths = self._coerce_paths(self.input_params)
         return self
-
-    @property
-    def names(self):
-        # This is where we hack popping out ctx if the function is a task.
-        # Maybe drop this; what are the odds someone uses @skippable on a
-        # regular function?
-        return (
-            list(self.sig.parameters.keys())[1:]
-            if list(self.sig.parameters.keys())[0] in ["c", "ctx"]
-            else self.sig.parameters.keys()
-        )
 
     def identify(self):
         return [self.name, self.input_paths, self.output_paths, self.flags]
@@ -402,7 +414,7 @@ class CallInfo(object):
             return val
 
     def _coerce_paths(self, param_names):
-        returning = []
+        returning_paths = []
         for name in param_names:
             runtime_value = self.ba.arguments[name]
             if name not in self.params_that_are_filenames:
@@ -411,7 +423,7 @@ class CallInfo(object):
             # Try to coerce before timestamp_differ to avoid cryptic error
             for p in paths:
                 try:
-                    returning.append(Path(p))
+                    returning_paths.append(Path(p))
                 except (ValueError, TypeError):
                     msg = (
                         "Received invalid path {!r} for path-taking parameter {!r}."
@@ -421,7 +433,7 @@ class CallInfo(object):
                         )
                     )
                     debug(msg)
-        return returning
+        return returning_paths
 
     def _look_for_params_with(self, type_annotation, words_to_match):
         """Goes through param list. If it looks like a filename, returns its runtime value."""
@@ -451,15 +463,15 @@ class FileFlagChecker(object):
     """
 
     def can_skip(self, ci):
-        self.care_about = _hash_str(
-            "task={}\nflags={}".format(
-                ci.name,
-                ", ".join(
-                    "{}:{!r}".format(param_name, argument_value)
-                    for param_name, argument_value in ci.flags
-                ),
-            )
+        call_str = "task={}\nflags={}".format(
+            ci.name,
+            ", ".join(
+                "{}:{!r}".format(param_name, argument_value)
+                for param_name, argument_value in ci.flags
+            ),
         )
+        debug("Determined call_str {!r} for {!r}".format(call_str, ci))
+        self.care_about = _hash_str(call_str)
 
         self.last_result_path = CachePath(".minv", ci.name, str(hash(ci)))
         ci.output_paths.append(self.last_result_path)
@@ -475,6 +487,7 @@ class FileFlagChecker(object):
                 )
             # Assumes non-root, but if folder, still works!
             flags_path = self._file_path_for_path(output_path)
+            # debug("Checking {!r} for {!r}".format(flags_path, call_str))
             if (
                 flags_path.exists()
                 and flags_path.read_bytes().decode() != self.care_about
@@ -520,7 +533,11 @@ class FileFlagChecker(object):
                 self.care_about.encode()
             )
         pickle.dump(ci.result, self.last_result_path.open("wb"))
-        debug("Done logging {} to {}".format(ci.result, self.last_result_path))
+        debug(
+            "Done logging return value {!r} to {}".format(
+                ci.result, self.last_result_path
+            )
+        )
 
     def load(self, ci):
         debug(
@@ -656,7 +673,7 @@ def _skippable(func, *args, **kwargs):
     # Just use the logs from fs checker if no one complained and forced a run
     result = failing_result if failing_result is not None else fs_result
     debug(
-        "{}skipping {} because {}".format(
+        "{}skipping {!r} because {}".format(
             "not " if not result.skippable else "",
             func.__name__,
             result.reason,

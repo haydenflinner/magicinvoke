@@ -6,6 +6,7 @@ magicinvoke.py for more doc.
 from ._version import __version_info__, __version__  # noqa
 from invoke import *  # noqa
 from .magicinvoke import (
+    cachepath,
     magictask,
     get_params_from_ctx,
     skippable,

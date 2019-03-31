@@ -103,6 +103,53 @@ def call_calls_pres():
     assert global_d["pre"] and global_d["post"] and global_d["skip_if"]
 
 
+from magicinvoke import skippable
+
+
+class MyClass(object):
+    @skippable
+    # @staticmethod
+    # TypeError: <staticmethod object> is not a callable object
+    # Python sucks sometimes :(
+    def func(self, val):
+        self.ran = True
+        return val
+
+
+def test_class_methods_skippable(tmpdir):
+    def test_case(m0):
+        print(repr(m0))
+        assert not hasattr(m0, "ran")
+        assert m0.func(True)
+        assert m0.ran
+
+        m0.ran = False
+        m0.func(True)
+        assert not m0.ran
+        m0.func(False)
+        assert m0.ran
+
+        m0.ran = False
+        m0.func(True)
+        m0.func(False)
+        assert not m0.ran
+
+    # Have to use non-temp objects to prevent interpreter giving us
+    # same address (and thus same __repr__) for multiple "self"s.
+    m0 = MyClass()
+    m1 = MyClass()
+    m2 = MyClass()
+
+    test_case(m0)
+    test_case(m1)
+    test_case(m2)
+
+
+def test_doesnt_call_non_lazy_ctx_values():
+    c = Config(defaults={"bad": lambda x, y: True})
+    assert c.bad(1, 2)
+
+
 # ------ Integration-y tests; run the examples
 @pytest.mark.parametrize(
     "folder, cmd, expected_output, py2_only",
