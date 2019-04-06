@@ -5,7 +5,7 @@ import types
 from os.path import join, splitext, expanduser
 from pprint import pformat
 
-from .util import signature, six, yaml
+from .util import signature, six, yaml, raise_from
 
 if six.PY3:
     try:
@@ -1362,13 +1362,18 @@ class Lazy(object):
         if not path:
             raise ValueError("path can not be None or empty.")
         # Bug here if we replace something later in the path (not beginning) but oh well.
+        self.orig_path = path
         path = path.replace(
             "ctx.", "c."
         )  # Allow both c. and ctx., but nothing else.
         self.path = path
 
     def __repr__(self):
-        return "Lazy({!r})".format(self.path)
+        return "Lazy({!r})".format(self.orig_path)
 
     def __call__(self, c):
-        return eval(self.path)
+        try:
+            return eval(self.path)
+        except Exception as e:
+            msg = "Exception while evalling {!r}".format(self.orig_path)
+            raise_from(type(e)(msg), e)

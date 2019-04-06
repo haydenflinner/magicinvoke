@@ -2,14 +2,11 @@ import os
 import re
 from contextlib import contextmanager
 
-try:
-    from invoke.vendor.six import raise_from, iteritems
-except ImportError:
-    from six import raise_from, iteritems
 
 from .config import Config, DataProxy
 from .exceptions import Failure, AuthFailure, ResponseNotAccepted
 from .runners import Result
+from .util import raise_from, iteritems
 from .watchers import FailingResponder
 
 
