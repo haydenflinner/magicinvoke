@@ -19,7 +19,7 @@ def print_name(c, name):
 
 
 @magictask(params_from="ctx.x.y")
-def print_x_y_z(c, z):
+def print_x_y_z(ctx, z):
     # Tests both parameter expansion and used to test -D x.y.z syntax
     print(z)
 

@@ -8,7 +8,7 @@ import pytest
 from pytest_relaxed import raises
 
 from invoke.runners import Local
-from invoke.config import Config
+from invoke.config import Config, Lazy
 from invoke.exceptions import (
     AmbiguousEnvVar,
     UncastableEnvVar,
@@ -286,8 +286,6 @@ Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_dat
             c3.A.loop.loop.get("loop")["loop"] == c3.A
             c3.A.get("loop", call=False)(c3) == c3.A
 
-            from magicinvoke import Lazy
-
             c3.A.num = Lazy("ctx.B")
             assert c3.A.num == c3.B
 
@@ -317,6 +315,13 @@ Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_dat
                 assert "foo" not in c
                 c.merge()
                 assert c.foo == "bar"
+
+        class lazy_tests:
+            def a(self):
+                l = Lazy('ctx.a.b.c')
+                with pytest.raises(AttributeError) as exc:
+                    l({'a': {}})
+                assert 'ctx.a.b.c' in str(exc.value)
 
         class deletion_methods:
             def pop(self):
