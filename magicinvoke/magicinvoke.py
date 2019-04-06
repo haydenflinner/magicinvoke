@@ -14,7 +14,7 @@ try:
 except:
     from pathlib2 import Path  # Py2
     from funcsigs import signature, Parameter
-from invoke.vendor.six import raise_from
+from invoke.util import raise_from
 from invoke.vendor.six.moves import filterfalse
 from invoke import Collection, task, Lazy, run  # noqa
 from invoke.tasks import Task
@@ -23,6 +23,7 @@ from invoke.vendor.decorator import decorate
 import cachepath  # noqa Add .rm to Paths
 from cachepath import CachePath
 
+from .exceptions import SaveReturnvalueError, DerivingArgsError
 
 def enable_logging(disable_invoke_logging=True):
     logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
@@ -42,6 +43,7 @@ for x in ("debug",):
 if os.getenv("MAGICINVOKE_TEST_DEBUG"):
     globals()["debug"] = print
 
+names_for_ctx = ["c", "ctx"]
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     """
@@ -183,13 +185,21 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             get_params_from_ctx, derive_kwargs=derive_kwargs, path=path
         )
 
-    if path and path.endswith("."):
-        raise ValueError(
-            "Path can't end in .! Try 'ctx' instead of 'ctx.', if you want the global namespace."
-        )
-
     # Only up here to we can use it to generate ParseError when decorated func gets called.
     sig = signature(func)
+    func_name = func.__name__
+
+    if path:
+        if path.endswith("."):
+            raise ValueError(
+                "Path can't end in .! Try 'ctx' instead of 'ctx.', if you want the global namespace."
+            )
+        if path.split(".")[0] not in names_for_ctx:
+            raise ValueError(
+                "Path {!r} into ctx for {}()'s args must start with 'ctx.' or 'c.'"
+                .format(path, func_name)
+            )
+
 
     @functools.wraps(func)
     def customized_default_decorator(*args, **kwargs):
@@ -204,54 +214,67 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         directly_passed = get_directly_passed(func, sig, args, kwargs)
 
         # Task.__call__ will error before us if ctx wasn't passed
-        # If you error here, rename your first arg (c) or (ctx) :)
-        ctx = args[0]
+        # Might want a non-task to be skippable, so just try to carry on without ctx.
+        ctx = args[0] if args else None
 
         class fell_through:  # Cheapest sentinel I can come up with
             pass
 
-        def try_directly_passed(param_name):
+        def get_directly_passed_arg(param_name):
             return directly_passed.pop(param_name, fell_through)
 
         def call_derive_kwargs_or_error(param_name):
             err = None
             result_cache = None
-            try:
-                result_cache = derive_kwargs(ctx) if derive_kwargs else {}
-            except AttributeError as e:
-                err = (
-                    "Failed to get parameter values from your derive_kwargs function!\n"
-                    "Exception encountered:\n{}".format(e.args[0])
-                )
-            if err:
-                raise AttributeError(err)
-
+            result_cache = derive_kwargs(ctx) if derive_kwargs else {}
             return result_cache.get(param_name, fell_through)
 
-        def traverse_path(param_name):
-            if path is None:
-                # TODO Maybe have access to namespaced name by now?
-                # __qualname__?
-                return ctx.config.get(func.__name__, {}).get(
-                    param_name, fell_through
-                )
+        def traverse_path_for_argdict():
+            # Use func.__name__ if user expected us to traverse ctx for them
+            if path is None and ctx:
+                return ctx.config.get(func_name, {})
+            elif path is None and not ctx:
+                return fell_through  # that's fine
+            elif path and not ctx:
+                # If explicitly ask us to traverse (with a path), but
+                # don't give ctx, what can we do?
+                # msg = "You gave path {!r} for {!r} args but 'ctx' (arg[0]) was {!r}.".format(path, func_name, ctx)
+                msg = "'ctx' (arg[0]) was {!r}. Cannot get dict from {} for args of {!r}.".format(ctx, path, func_name)
+                raise DerivingArgsError(msg)
             seq = path.split(".")
             looking_in = ctx.config
             seq.pop(0)
             while seq:
                 key = seq.pop(0)
-                looking_in = looking_in[key]
-            return looking_in.get(param_name, fell_through)
+                try:
+                    looking_in = looking_in[key]
+                except Exception as e:
+                    raise_from(
+                        DerivingArgsError(
+                            "{} while traversing path {!r} for {}() args.".format(repr(e), path, func_name)
+                            ),
+                        e
+                    )
+            return looking_in
 
-        param_name_to_callable = {
+        ctx_argdict = None # I feel bad for prematurely optimizing here,  but
+        # it's not going to stop me form doing it. This way, only error if we
+        # actually needed to look in ctx for the argdict.
+        def get_from_ctx(param_name):
+            nonlocal ctx_argdict
+            if ctx_argdict is None:
+                ctx_argdict = traverse_path_for_argdict()
+            return ctx_argdict.get(param_name, fell_through)
+
+        param_name_to_callable_default = {
             param_name: param.default
             for param_name, param in signature(func).parameters.items()
             if param.default is not param.empty and callable(param.default)
         }
 
-        def call_callable(param_name):
-            if param_name in param_name_to_callable:
-                return param_name_to_callable[param_name](ctx)
+        def call_callable_default(param_name):
+            if param_name in param_name_to_callable_default:
+                return param_name_to_callable_default[param_name](ctx)
             return fell_through
 
         # Decide through cascading what to use as the value for each parameter
@@ -260,24 +283,35 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         for param_name in expecting:
             possibilities = (
                 # First, positionals and kwargs
-                try_directly_passed,
+                get_directly_passed_arg,
                 # Then check ctx
-                traverse_path,
-                # ...
-                call_derive_kwargs_or_error,
-                call_callable,
+                get_from_ctx,
+                call_derive_kwargs_or_error,  # Not really used/tested
+                call_callable_default,
             )
 
             passing = fell_through
             for p in possibilities:
-                passing = p(param_name)
+                try:
+                    passing = p(param_name)
+                except Exception as e:
+                    if type(e) is DerivingArgsError:
+                        raise
+                    raise_from(DerivingArgsError(
+                        "in {!r} step of deriving args for param {!r} of {}()".format(
+                            p.__name__, param_name, func_name
+                        )),
+                        e
+                    )
                 if passing is not fell_through:
+                    debug("Received value {:.25}... from {!r} for {!r}".format(str(passing), p.__name__, param_name))
                     break
 
             if passing is not fell_through:
                 args_passing[param_name] = passing
 
         # Now, bind and supply defaults to see if any are still missing.
+        # Partial bind and then error because funcsigs error msg succ.
         ba = sig.bind_partial(**args_passing)
         # getcallargs isn't there on funcsig version.
         missing = []
@@ -287,7 +321,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         # TODO contribute these improved error messages back to funcsigs
         if missing:
             msg = "{!r} did not receive required positional arguments: {}".format(
-                func.__name__,
+                func_name,
                 ", ".join(
                     repr(p_name)
                     for p_name, p in list(sig.parameters.items())[1:]
@@ -313,6 +347,8 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         p.replace(default=None) if p.default is p.empty else p
         for p in sig.parameters.values()
     ]
+    if not myparams or myparams[0].name not in ('c', 'ctx'):
+        raise ValueError("Can't have a derive_kwargs_from_ctx function that doesn't have a context arg!")
     # Don't provide default for ctx
     myparams[0] = list(sig.parameters.values())[0]
     mysig = sig.replace(parameters=myparams)
@@ -354,7 +390,7 @@ class CallInfo(object):
             param_name
             for param_name in self.sig.parameters
             if not param_name.startswith("_")
-            and param_name not in ["c", "ctx"]
+            and param_name not in names_for_ctx
             and param_name not in self.output_params
             and param_name not in self.input_params
         ]
@@ -385,8 +421,8 @@ class CallInfo(object):
             if param_name in self.params_modify_behavior
         ]
         # Input_paths gets mutated later!
-        self.output_paths = self._coerce_paths(self.output_params)
-        self.input_paths = self._coerce_paths(self.input_params)
+        self.output_paths = self._coerce_paths(self.output_params, self.flags)
+        self.input_paths = self._coerce_paths(self.input_params, self.flags)
         return self
 
     def identify(self):
@@ -394,10 +430,6 @@ class CallInfo(object):
 
     def __hash__(self):
         return sum(_hash_int(x) for x in self.identify())
-
-    @property
-    def _params_not_ctx(self):
-        return [p for p in self.sig.parameters if p not in ["c", "ctx"]]
 
     def _to_list_if_not_already(self, val):
         """
@@ -413,30 +445,36 @@ class CallInfo(object):
         else:
             return val
 
-    def _coerce_paths(self, param_names):
+    def _coerce_paths(self, param_names, params_change_behavior):
         returning_paths = []
         for name in param_names:
             runtime_value = self.ba.arguments[name]
-            if name not in self.params_that_are_filenames:
-                continue
             paths = self._to_list_if_not_already(runtime_value)
             # Try to coerce before timestamp_differ to avoid cryptic error
+            rejected_values = []
             for p in paths:
                 try:
                     returning_paths.append(Path(p))
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
                     msg = (
-                        "Received invalid path {!r} for path-taking parameter {!r}."
-                        " Do you have a parameter with 'file' or 'path' in the name"
-                        " that's not supposed to receive Paths?".format(
-                            p, name
-                        )
+                        "Received invalid path {!r} "
+                        "for path-taking parameter {!r}.".format(p, name)
                     )
-                    debug(msg)
+                    # Somewhat complex logic here to allow None paths vs regular paths
+                    # while not having function mistakenly skipped.
+                    if not p:
+                        debug(msg)
+                        rejected_values.append(p)
+                    else:
+                        raise type(e)(msg)
+                        # raise_from(type(e)(msg), e)
+            if rejected_values:
+                params_change_behavior.append((name, rejected_values))
+
         return returning_paths
 
     def _look_for_params_with(self, type_annotation, words_to_match):
-        """Goes through param list. If it looks like a filename, returns its runtime value."""
+        """If param name looks like a filename, returns its arg value."""
         returning = []
         for param_name in self.sig.parameters:
             if param_name in ["ctx", "c"]:
@@ -455,7 +493,6 @@ class CallInfo(object):
                 self.params_that_are_filenames.append(param_name)
                 returning.append(param_name)
         return returning
-
 
 class FileFlagChecker(object):
     """
@@ -497,7 +534,7 @@ class FileFlagChecker(object):
         return SkipResult(
             can_skip,
             "{} last generated with {} flags".format(
-                ("%s was" % failed_path) if failed_path else "no files were",
+                ("%s was" % repr(failed_path)) if failed_path else "no files were",
                 "same" if can_skip else "different",
             ),
         )
@@ -523,16 +560,15 @@ class FileFlagChecker(object):
 
     def after_run(self, ci):
         """
-        There could be a racy condition here if someone changes one of the output
-        files between your function returning and us creating this file. But if
-        that happens, why are you writing the file at all?
         """
         for path in ci.output_paths:
-            debug("Logging flags to {!r}".format(path))
-            self._file_path_for_path(path).write_bytes(
-                self.care_about.encode()
-            )
-        pickle.dump(ci.result, self.last_result_path.open("wb"))
+            fp_for_path = self._file_path_for_path(path)
+            debug("Logging flags for {!r} to {!r}".format(path, fp_for_path))
+            fp_for_path.write_bytes(self.care_about.encode())
+        try:
+            pickle.dump(ci.result, self.last_result_path.open("wb"))
+        except Exception as e:
+            raise SaveReturnvalueError(*e.args)
         debug(
             "Done logging return value {!r} to {}".format(
                 ci.result, self.last_result_path
@@ -628,7 +664,8 @@ def skippable(func, *args, **kwargs):
     func.checker = FileFlagChecker()
 
     # Convince invoke to pass us --clean and --force-run flags
-    # I tried pos_or_kwarg here to try to fix py2; no dice.
+    # I tried pos_or_kwarg here to try to fix PY2; no dice.
+    # Perhaps follow_wrapped=False, and contribute that to funcsigs backport
     sig = signature(func)
     myparams = collections.OrderedDict(sig.parameters)
     myparams["_clean"] = Parameter(
@@ -684,6 +721,10 @@ def _skippable(func, *args, **kwargs):
         try:
             return func.checker.load(ci)
         except Exception as e:
+            # Never seen this happen, but I imagine we would rather degrade
+            # to calling the function again rather than quitting or returning
+            # a bad value.
+            debug("Failed to load cached result for {!r}.".format(ci.name))
             debug(e)
 
     ci.result = func(*args, **kwargs)
@@ -706,6 +747,10 @@ def timestamp_differ(input_filenames, output_filenames):
     """
     # Always run things that don't produce a file
     if not output_filenames:
+        # No longer covered in tests since magicinvoke.skippable gives a dummy
+        # output_filename file for each function for storing its return value.
+        # Preserved in case that changes + so that timestamp differ can remain
+        # usable outside of its use in this module.
         return (
             False,
             "has_inputs:{} has_outputs:{}".format(
@@ -752,14 +797,18 @@ def get_directly_passed(func, sig, args, kwargs):
 
     Don't call it on itself! Or do, I'm not the cops.
     """
-
     try:
         ba = sig.bind_partial(*args, **kwargs)
     except TypeError as e:
-        # TODO contribute these better error messages back to funcsigs
+        # TODO contribute these better error messages back to:
+        #   funcsigs or  /usr/lib64/python3.7/inspect.py:3022
+        # inspect already has _too_many, but only for getcallargs.
+        # Which is basically what this is. So, port getcallargs
+        # to funcsigs, use it?
         if "too many" in e.args[0]:
-            msg = "{!r} accepts {} arguments but received {}".format(
+            msg = "{}{} takes {} arguments but {} were given".format(
                 func.__name__,
+                sig,
                 len(
                     [
                         p
@@ -771,11 +820,11 @@ def get_directly_passed(func, sig, args, kwargs):
                 # Might not be 100% correct
                 len(args) + len(kwargs),
             )
-            raise_from(TypeError(msg), None)
-        if "unexpected keyword" in e.args[0]:
-            msg = "{!r} ".format(func.__name__)
+            raise_from(TypeError(msg), e)
+        elif "unexpected keyword" in e.args[0]:
+            msg = "{!r} {}".format(func.__name__, e.args[0])
             # from None -- handy trick to get rid of that crappy default error
-            raise_from(TypeError(msg + e.args[0]), None)
+            raise_from(TypeError(msg), None)
         raise
 
     return ba.arguments

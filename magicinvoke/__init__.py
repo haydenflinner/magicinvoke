@@ -14,6 +14,7 @@ from .magicinvoke import (
     Lazy,
     OutputPath,
 )
+from . import exceptions
 
 # Things that are handy for everyone to have
 try:
