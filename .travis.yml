@@ -46,8 +46,6 @@ install:
 before_script:
   # Create 'sudouser' w/ sudo password & perms on Travis' homedir
   - inv travis.make-sudouser
-  # Blacken and flake8 before running any tests, it's a faster fail
-  - inv travis.blacken
   - flake8
 script:
   # Execute full test suite + coverage, as the new sudo-capable user
