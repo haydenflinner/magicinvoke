@@ -202,7 +202,7 @@ class test_nice_errors_for_skippables():
             pass
         with pytest.raises(TypeError) as e:
             mine(x=2, y=3, z=4)
-        assert 'unexpected keyword' in str(e)
+        assert 'unexpected keyword' in str(e) if six.PY3 else 'takes 1 arguments but 3 were given' in str(e)
         with pytest.raises(TypeError) as e:
             mine(1, 2, 3, 4)
         assert 'mine(ctx) takes 1 arguments but 4 were given' in str(e)

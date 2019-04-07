@@ -1,3 +1,4 @@
+from __future__ import print_function
 import collections
 import os
 from functools import partial
@@ -218,15 +219,21 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
         class fell_through:  # Cheapest sentinel I can come up with
             pass
+        cache = {'derived': {}, 'ctx_argdict': {}}  # Don't have nonlocal in py2
 
         def get_directly_passed_arg(param_name):
             return directly_passed.pop(param_name, fell_through)
 
         def call_derive_kwargs_or_error(param_name):
-            result = derive_kwargs(ctx) if derive_kwargs else {}
+            if not derive_kwargs:
+                return fell_through
+            if not cache['derived']:
+                cache['derived'] = derive_kwargs(ctx)
+            result = cache['derived']
             return result.get(param_name, fell_through)
 
         def traverse_path_for_argdict():
+            # Could just use eval(path) with a similar trick to invoke.Lazy.
             # Use func.__name__ if user expected us to traverse ctx for them
             if path is None and ctx:
                 return ctx.config.get(func_name, {})
@@ -254,14 +261,10 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                     )
             return looking_in
 
-        ctx_argdict = None # I feel bad for prematurely optimizing here,  but
-        # it's not going to stop me form doing it. This way, only error if we
-        # actually needed to look in ctx for the argdict.
         def get_from_ctx(param_name):
-            nonlocal ctx_argdict
-            if ctx_argdict is None:
-                ctx_argdict = traverse_path_for_argdict()
-            return ctx_argdict.get(param_name, fell_through)
+            if not cache['ctx_argdict']:
+                cache['ctx_argdict'] = traverse_path_for_argdict()
+            return cache['ctx_argdict'].get(param_name, fell_through)
 
         param_name_to_callable_default = {
             param_name: param.default
