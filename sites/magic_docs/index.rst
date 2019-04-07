@@ -8,6 +8,62 @@ adds support for lots of goodies:
 * ``*args`` **and** ``**kwargs`` **support!**
   See how easy it is here: :ref:`args-kwargs`. 
 
+* **Automatic filling of parameters from ctx!**
+  Have you ever wondered why you can put ``'run': {'echo': True}`` in
+  ``invoke.yaml`` and suddenly ``echo=True`` gets passed to all
+  ``ctx.run`` s, but you can't do the same for your own tasks?
+
+  Wonder no longer with :meth:`magicinvoke.get_params_from_ctx`! Here's how you
+  would implement a task like ctx.run::
+
+      @magictask
+      def myrun(ctx, cmd, echo=False):
+          pass
+
+* **Make-like caching, file dependency recognition, and work-avoidance!**
+  Cache the results of expensive functions on disk::
+
+    @magictask(skippable=True)  # Caches to /tmp/.minv/expensive_task/xyz123
+    def expensive_task(ctx, url):
+        return ctx.run('wget {}'.format(url)).stdout
+
+  Also works with input/output file based functions::
+
+    @magictask(skippable=True)
+    def compile(ctx input_c_files, output_executable, debug=False):
+        # Will not run if all input_c_files are older than output file and output
+        # file was last generated with same 'flag' values like 'debug' arg.
+        ctx.run('gcc {} -o {}'.format(' '.join(input_c_files), output_executable))
+
+  For API doc, see :meth:`magicinvoke.skippable`. 
+
+  For more examples, check out a basic
+  :ref:`data-pipeline`.
+  or a Py3-specific, more advanced 
+  :ref:`make-replacement`.
+
+
+* **Arbitrary task filtering!**
+    Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
+    `from this issue
+    <https://github.com/pyinvoke/invoke/issues/461>`_. Basically, you can
+    add your own functions that decide whether or not your task should run::
+
+      @task
+      def always_skip(ctx):
+          return True
+
+      @task(skip_ifs=[always_skip])
+      def never_runs(ctx):
+          print("Never happens!")
+
+* **Single-step namespaced tasks!**
+    Merges the very helpful
+    `patch <https://github.com/pyinvoke/invoke/pull/527#issue-189000872>`_
+    written by @judy2k. No longer need to manually add each function to the
+    current namespace, making it easier to switch over to explicit namespaces.
+    See his GitHub issue for usage.
+
 * **Program.invoke, thanks @rectalogic!** Example usage::
 
     @task
@@ -17,78 +73,40 @@ adds support for lots of goodies:
   `Longer explanation here. <https://github.com/pyinvoke/invoke/pull/613>`_
 
 
-* **Automatic filling of parameters from ctx!**
-  Have you ever wondered why you can put ``'run': {'echo': True}`` in
-  ``invoke.yaml`` and suddenly ``echo=True`` gets passed to all
-  ``ctx.run()``s, but you **can't do the same for your own tasks?**
-
-  Wonder no longer with :meth:`magicinvoke.get_params_from_ctx`! Here's how you
-  would implement a task like ctx.run::
-
-      @magictask(params_from='ctx.myrun')
-      def myrun(ctx, cmd, echo=False):
-          pass
-
-* **Make-like file dependency recognition and work-avoidance!**
-  Check out a basic
-  :ref:`data-pipeline`.
-  or a Py3-specific, more advanced 
-  :ref:`make-replacement`.
-
-  Useful when
-      you don't want something as cryptic or platform-specific as Make and bash,
-      or you also want to use Python tools like matplotlib or numpy. For API
-      doc, check out :meth:`magicinvoke.skippable`. 
-
-* **Arbitrary task filtering!**
-    Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
-    `from this issue
-    <https://github.com/pyinvoke/invoke/issues/461>`_. Basically, you can
-    add your own functions that decide whether or not your task should run.
-
-* **Single-step namespaced tasks!**
-    Merges the very helpful
-    `patch <https://github.com/pyinvoke/invoke/pull/527#issue-189000872>`_
-    written by @judy2k. No longer need to manually add each function to the
-    current namespace, resulting in less code being written, and it's
-    code that's easier to get right.
-
- 
 * **Bugfixes**
 
-  * Fix cryptic error when doing ``ctx.cd(pathlib.Path)`` (#454)
+  * Fix cryptic error when doing ``ctx.cd(pathlib.Path)`` (#454).
     
-  * Fix help documentation for misspelled variable names silently being ignored (#409)
+  * Fix help documentation for misspelled variable names silently being ignored (#409).
 
-  * Fix help documentation with - instead of _ being silently being ignored (#398)
+  * Fix help documentation with - instead of _ being silently being ignored (#398).
 
-  * Fix silently ignoring config file path  (#560)
+  * Fix silently ignoring config file path  (#560).
 
-  * Fix cryptic error when task passed ``pre=func`` instead of ``pre=[func]``
+  * Fix cryptic error when task passed ``pre=func`` instead of ``pre=[func]``.
 
-  * Fix cryptic error when ``@task('func')`` instead of ``@task(func)`` (#598)
+  * Fix cryptic error when ``@task('func')`` instead of ``@task(func)`` (#598).
+
+  * Private tasks (starting with ``_``) no longer show up in task list.
 
 
-Jump In
---------
-``pip uninstall -y invoke; pip install magicinvoke``
+Get Started
+-----------
+``pip install magicinvoke``
 
-**Invoke Beginner's Note** 
+Beginner's Note: 
 `Invoke's documentation <http://pyinvoke.org>`_ is the best place to start,
 as the majority of using this library is just like using regular ``invoke``.
-However, you should still install ``pip install magicinvoke`` to get the
-improved error messages while you learn.
+You should still install ``pip install magicinvoke`` to get the
+improved error messages.
 
-**MagicInvoke**
-
+Examples
+---------
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
     :glob:
 
     examples/**
-
-Read the doc for :mod:`magicinvoke` or check the below example projects to
-see if ``magicinvoke`` can improve ``invoke`` for you!
 
 .. _api:
 

@@ -1,5 +1,5 @@
 =======================================
-File dependency resolution!
+GNU Make Replacement
 =======================================
 .. _make-replacement:
 

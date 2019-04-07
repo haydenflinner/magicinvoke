@@ -1,5 +1,5 @@
 =======================================
-Cache slow steps transparently!
+Easily caching expensive tasks
 =======================================
 .. _data-pipeline:
 
@@ -13,6 +13,7 @@ You should observe that the 'expensive' get step only happened the first time.
 
 Below is a relatively simple tasks file that defines a few tasks. A couple
 which do something expensive, and cache their results on the filesystem:
+
   * get_people - Writes a list of names to ``people.txt`` in line-separated form
   * get_peoples_ages - Writes a list of names + ages to ``people-with-ages.txt``
     in line-separated form
