@@ -5,7 +5,7 @@ magicinvoke.py for more doc.
 
 from ._version import __version_info__, __version__  # noqa
 from invoke import *  # noqa
-from .magicinvoke import (
+from .magicinvoke import (  # noqa
     cachepath,
     magictask,
     get_params_from_ctx,
@@ -14,7 +14,7 @@ from .magicinvoke import (
     Lazy,
     OutputPath,
 )
-from . import exceptions
+from . import exceptions  # noqa
 
 # Things that are handy for everyone to have
 try:

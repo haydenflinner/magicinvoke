@@ -158,16 +158,15 @@ class test_nice_errors_for_skippables():
         def myfunc(ctx, x=self._raise_func):
             return x
 
-        with pytest.raises(DerivingArgsError) as exc:
+        with pytest.raises(DerivingArgsError):
             myfunc()
-
 
     def test2(self):
         from magicinvoke.exceptions import SaveReturnvalueError
         @skippable
         def fail_to_pickle(x=lambda: None):
             return x
-        with pytest.raises(SaveReturnvalueError) as exc:
+        with pytest.raises(SaveReturnvalueError):
             fail_to_pickle()
 
     def test_forgot_ctx_param(self):
@@ -193,7 +192,7 @@ class test_nice_errors_for_skippables():
         # myfunc(badpath) to be skipped
         myfunc(None)  # Allowed
         with pytest.raises(TypeError) as exc:
-            myfunc(lambda z: x)  # Allowed
+            myfunc(lambda z: 'x')  # Allowed
         assert 'invalid path' in str(exc.value)
         # @get_params_from_ctx(myarg=Lazy('x.y.z'))
 

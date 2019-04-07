@@ -226,7 +226,7 @@ class Collection(object):
                 ret._configuration = obj_config
                 return ret
         # Failing that, make our own collection from the module's tasks.
-        tasks = [obj for name, obj in vars(module).items() if isinstance(obj, Task) and not name.startswith('_')]
+        tasks = [t for t_name, t in vars(module).items() if isinstance(t, Task) and not t_name.startswith('_')]
         # Again, explicit name wins over implicit one from module path
         collection = instantiate()
         for task in tasks:

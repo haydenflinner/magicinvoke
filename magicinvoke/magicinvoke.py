@@ -6,7 +6,6 @@ import hashlib
 import itertools
 import logging
 import pickle
-from textwrap import dedent
 
 try:
     from pathlib import Path  # Py3
@@ -192,7 +191,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     if path:
         if path.endswith("."):
             raise ValueError(
-                "Path can't end in .! Try 'ctx' instead of 'ctx.', if you want the global namespace."
+                "Path can't end in .! Try 'ctx' instead of 'ctx.'."
             )
         if path.split(".")[0] not in names_for_ctx:
             raise ValueError(
@@ -224,10 +223,8 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             return directly_passed.pop(param_name, fell_through)
 
         def call_derive_kwargs_or_error(param_name):
-            err = None
-            result_cache = None
-            result_cache = derive_kwargs(ctx) if derive_kwargs else {}
-            return result_cache.get(param_name, fell_through)
+            result = derive_kwargs(ctx) if derive_kwargs else {}
+            return result.get(param_name, fell_through)
 
         def traverse_path_for_argdict():
             # Use func.__name__ if user expected us to traverse ctx for them
@@ -252,7 +249,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                     raise_from(
                         DerivingArgsError(
                             "{} while traversing path {!r} for {}() args.".format(repr(e), path, func_name)
-                            ),
+                        ),
                         e
                     )
             return looking_in

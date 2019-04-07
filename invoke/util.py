@@ -36,7 +36,7 @@ except ImportError:
     from six.moves import reduce  # noqa
     import yaml  # noqa
 
-from six import raise_from, iteritems
+from six import raise_from, iteritems  # noqa
 
 LOG_FORMAT = "%(name)s.%(module)s.%(funcName)s: %(message)s"
 
