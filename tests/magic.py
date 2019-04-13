@@ -38,7 +38,7 @@ def args_kwargs(ctx):
 
 
 def expand_ctx(ctx):
-    ctx = Context(Config({"test_task": {"x": 1, "y": 2}}))
+    ctx = Context(Config({"magic.test_task": {"x": 1, "y": 2}}))
 
     @magictask
     def test_task(ctx, x, y=None):
@@ -182,7 +182,7 @@ class test_nice_errors_for_skippables():
             pass
         with pytest.raises(TypeError) as exc:
             myfunc(Context())
-        assert "'myfunc' did not receive required positional arguments: 'x'" in str(exc)
+        assert "myfunc' did not receive required positional arguments: 'x'" in str(exc)
 
     def test_bad_path_to_skippable(self):
         @skippable

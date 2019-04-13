@@ -23,14 +23,14 @@ adds support for lots of goodies:
 * **Make-like caching, file dependency recognition, and work-avoidance!**
   Cache the results of expensive functions on disk::
 
-    @magictask(skippable=True)  # Caches to /tmp/.minv/expensive_task/xyz123
+    @magictask(skippable=True)  # Caches to /tmp/.minv/tasks.expensive_task/xyz123
     def expensive_task(ctx, url):
         return ctx.run('wget {}'.format(url)).stdout
 
   Also works with input/output file based functions::
 
-    @magictask(skippable=True)
-    def compile(ctx input_c_files, output_executable, debug=False):
+    @skippable
+    def compile(ctx, input_c_files, output_executable, debug=False):
         # Will not run if all input_c_files are older than output file and output
         # file was last generated with same 'flag' values like 'debug' arg.
         ctx.run('gcc {} -o {}'.format(' '.join(input_c_files), output_executable))

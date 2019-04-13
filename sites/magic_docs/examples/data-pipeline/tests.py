@@ -78,7 +78,8 @@ def test_this(ctx):
 
     bprint("Make sure clean actually cleans.")
     if six.PY2:
-        CachePath('.minv', 'get_peoples_ages').rm()
+        # If you fail here it's because we assume how minv implemented these paths :)
+        CachePath('.minv', 'tasks.get_peoples_ages').rm()
     else:
         ctx.run("invoke get-peoples-ages --clean")
     both_ran(ctx.run("invoke print-peoples-ages").stdout)

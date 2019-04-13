@@ -53,16 +53,31 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     :param str path:
         A path in the format ``'ctx.arbitraryname.unpackthistomyparams'``
         to use to find defaults for the function.
-        Default: ``'ctx.myfuncname'``
+        Default: ``'ctx.mymodulename.myfuncname'``
 
-        You shouldn't need to pass this unless you rename your function and don't
-        want to modify old configs, or if you'd like to pull the config for a lot
-        of tasks from the same place in ctx.
+        It's good to pass this explicitly to make it clear where your arguments
+        are coming from.
+
 
     :param Callable derive_kwargs:
         Overkill. Is passed ``ctx`` as first arg, expected to
         return dict of the format ``{'argname': 'defaultvalueforparam'}``.
-        Default: ``ctx.get(func.__name__)``.
+
+    **Examples**::
+
+        @get_params_from_ctx(path='ctx.randompath')  # just 'ctx' works as well
+        def myfuncname(ctx, requiredparam1, namedparam2='trulyoptional'):
+            print(requiredparam1, namedparam2)
+
+    If your default is a callable we will call it with ``args[0]``. This is how
+    :meth:`invoke.config.Lazy` works under the hood.
+    That is, this is a valid function::
+
+        @get_params_from_ctx
+        def myfuncname(ctx,
+                       namedparam0=Lazy('ctx.mynamedparam0'),
+                       namedparam1=lambda ctx: ctx.myvalue * 4):
+            print(namedparam1)  # 4, if myvalue == 1 :)
 
     **Why do I need this?** Suppose this configuration\:
 
@@ -128,7 +143,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         def myfuncname(ctx, requiredparam1, namedparam2='trulyoptional')
             print(requiredparam1, namedparam2)
 
-        ns.configure({"myfuncname" : {"requiredparam1" : 392}})
+        ns.configure({"tasks": {"myfuncname" : {"requiredparam1" : 392}}})
 
     The semantics of the raw python function now match the cmd-line task:
 
@@ -141,42 +156,11 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
     The cascading order for finding an argument value is as follows:
 
-    * directly passed (i.e. task(ctx, 'arghere') or --arg arghere on cmd line
-
-    * config (ctx) (defaults to ctx.func.__name__)
-
-    * derive_kwargs your callable that you shouldn't ever need :)
-
-    * callable defaults - default parameter values that are callable are called
-      with callable(ctx) to get the value that should be used for a default.
-
-    * actual defaults - the regular defaults in the function header.
-
-
-    **Advanced Usage** The source is relatively simple, but you can imagine
-    it works like this:
-
-    ``**user_provided_args_and_kwargs.update(ctx[yourfunctionname])``
-
-    with more error checking. As such, you can tell us where to look for
-    arguments, if you'd like. This is equivalent to the default::
-
-        @get_params_from_ctx(path='ctx.myfuncname')
-        def myfuncname(ctx, requiredparam1, namedparam2='trulyoptional'):
-            print(requiredparam1, namedparam2)
-
-    Note that you can add an arbitrary number of dots to this. That is:
-    'ctx.another_level.xyz.myfuncnameargs' is a valid value for the path.
-
-    Secret way: If your default is a callable (which doesn't mean anything
-    for most Invoke tasks), we will call it with ctx. This is how
-    :meth:`invoke.config.Lazy` works under the hood.
-    That is::
-
-        @get_params_from_ctx(path='ctx.myfuncname')
-        def myfuncname(ctx, requiredparam1,
-            namedparam1=lambda ctx: ctx.othertask.controlflag):
-            print(requiredparam1, namedparam1)
+        1. directly passed (i.e. ``task(ctx, 'arghere')`` or ``--arg arghere`` on cmd line
+        2. from config (``ctx`` arg) (defaults to ctx.__module__.func.__name__)
+        3. function defaults (``def myfunc(ctx, default=1)``) - default parameter values
+           that are callable are called
+           with callable(ctx) to get the value that should be used for a default.
 
 
     .. versionadded:: 0.1
@@ -188,7 +172,9 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
     # Only up here to we can use it to generate ParseError when decorated func gets called.
     sig = signature(func)
-    func_name = func.__name__
+    func_name = _get_full_name(func)
+    func.ctx_path = path or 'ctx.{}'.format(func_name)
+    debug("Set {}() param ctx-path to {!r}".format(func_name, func.ctx_path))
 
     if path:
         if path.endswith("."):
@@ -200,6 +186,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 "Path {!r} into ctx for {}()'s args must start with 'ctx.' or 'c.'"
                 .format(path, func_name)
             )
+    user_passed_path = path  # Necessary because otherwise doesn't go into closure on py2.
 
 
     @functools.wraps(func)
@@ -235,17 +222,16 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
         def traverse_path_for_argdict():
             # Could just use eval(path) with a similar trick to invoke.Lazy.
-            # Use func.__name__ if user expected us to traverse ctx for them
-            if path is None and ctx:
-                return ctx.config.get(func_name, {})
-            elif path is None and not ctx:
-                return fell_through  # that's fine
-            elif path and not ctx:
+            if user_passed_path is None and not ctx:
+                return {}  # that's fine
+            elif user_passed_path and not ctx:
                 # If explicitly ask us to traverse (with a path), but
                 # don't give ctx, what can we do?
                 # msg = "You gave path {!r} for {!r} args but 'ctx' (arg[0]) was {!r}.".format(path, func_name, ctx)
                 msg = "'ctx' (arg[0]) was {!r}. Cannot get dict from {} for args of {!r}.".format(ctx, path, func_name)
                 raise DerivingArgsError(msg)
+
+            path = func.ctx_path
             seq = path.split(".")
             looking_in = ctx.config
             seq.pop(0)
@@ -253,12 +239,16 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 key = seq.pop(0)
                 try:
                     looking_in = looking_in[key]
-                except Exception as e:
-                    reraise_with_context(
-                        e,
-                        "while traversing path {!r} for {}() args.".format(repr(e), path, func_name),
-                        DerivingArgsError
-                    )
+                except (KeyError, AttributeError) as e:
+                    msg = "while traversing path {!r} for {}() args.".format(path, func_name),
+                    if user_passed_path:
+                        reraise_with_context(
+                            e,
+                            DerivingArgsError
+                        )
+                    else:
+                        debug("Ignoring {!r} {}".format(type(e).__name__, msg))
+                        return {}
             return looking_in
 
         def get_from_ctx(param_name):
@@ -305,8 +295,12 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                         DerivingArgsError
                     )
                 if passing is not fell_through:
-                    debug("Received value {:.25}... from {!r} for {!r}".format(str(passing), p.__name__, param_name))
+                    debug("{}(): {} found value {:.25}... for param {!r}".format(
+                        func_name, p.__name__, str(passing), param_name)
+                    )
                     break
+                else:
+                    debug("{}(): {} failed to find value for param {!r}".format(func_name, p.__name__, param_name))
 
             if passing is not fell_through:
                 args_passing[param_name] = passing
@@ -363,6 +357,12 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 InputPath = "input"
 OutputPath = "output"
 
+def _get_full_name(func):
+    return "{}.{}".format(
+        func.__module__,
+        getattr(func, "__qualname__", func.__name__)
+    )
+
 
 def _hash_str(obj):
     return hashlib.sha224(str(obj).encode("utf-8")).hexdigest()
@@ -377,7 +377,7 @@ class CallInfo(object):
         return "CallInfo({!r})".format(self.name)
 
     def __init__(self, func):
-        self.name = getattr(func, "__qualname__", func.__name__)
+        self.name = _get_full_name(func)
         sig = signature(func)
         self.sig = sig
         self.params_that_are_filenames = []
@@ -505,12 +505,12 @@ class FileFlagChecker(object):
             ", ".join(
                 "{}:{!r}".format(param_name, argument_value)
                 for param_name, argument_value in ci.flags
-            ),
+            )
         )
         debug("Determined call_str {!r} for {!r}".format(call_str, ci))
         self.care_about = _hash_str(call_str)
 
-        self.last_result_path = CachePath(".minv", ci.name, str(hash(ci)))
+        self.last_result_path = CachePath(".minv", ci.name, str(ci.persistent_hash()))
         ci.output_paths.append(self.last_result_path)
 
         if not ci.flags:

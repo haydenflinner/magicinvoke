@@ -34,7 +34,7 @@ def get_peoples_ages(ctx,
     return results
 
 
-@ns.magictask(params_from="ctx.people")
+@ns.magictask
 def print_peoples_ages(ctx):
     print("print_peoples_ages called")
     names_and_ages = get_peoples_ages(ctx)
