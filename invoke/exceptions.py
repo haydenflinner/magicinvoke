@@ -350,9 +350,7 @@ class ResponseNotAccepted(WatcherError):
 
     pass
 
-def reraise_with_context(orig_exc, extra_msg, new_exc_type=None):
-    import sys
-    msg = "{}: {}\n\t{}".format(type(orig_exc).__name__, orig_exc, extra_msg)
-    new_exc_type = new_exc_type or type(orig_exc)
-    
-    raise new_exc_type, msg, sys.exc_traceback
+if six.PY2:
+    from .exc_old import reraise_with_context
+else:
+    from .exc_new import reraise_with_context

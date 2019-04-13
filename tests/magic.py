@@ -39,6 +39,8 @@ def args_kwargs(ctx):
 
 def expand_ctx(ctx):
     ctx = Context(Config({"magic": {"test_task": {"x": 1, "y": 2}}}))
+    # Dirty remap since qualname on py3 does a better job.
+    ctx.magic.expand_ctx = {"<locals>": {"test_task": lambda ctx: ctx.magic.test_task}}
 
     @magictask
     def test_task(ctx, x, y=None):

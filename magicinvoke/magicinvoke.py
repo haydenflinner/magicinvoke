@@ -379,7 +379,7 @@ class CallInfo(object):
 
     def __init__(self, func):
         self.name = _get_full_name(func)
-        self.code_hash = _hash_int(func.__code__.co_code)
+        self.code_hash = _hash_str(func.__code__.co_code)
         sig = signature(func)
         self.sig = sig
         self.params_that_are_filenames = []
@@ -430,10 +430,13 @@ class CallInfo(object):
 
     def identify(self):
         """Things that make this call to the function unique."""
-        return [self.name, self.input_paths, self.output_paths, self.flags, self.code_hash]
+        yield self.name
+        for x in itertools.chain(self.input_paths, self.output_paths, self.flags):
+            yield str(x)
+        yield self.code_hash
 
     def persistent_hash(self):
-        return sum(_hash_int(x) for x in self.identify())
+        return sum(_hash_int(x.encode('utf-8')) for x in self.identify())
 
     def _to_list_if_not_already(self, val):
         """
@@ -511,7 +514,7 @@ class FileFlagChecker(object):
             )
         )
         debug("Determined call_str {!r} for {!r}".format(call_str, ci))
-        self.care_about = _hash_str(call_str)
+        self.care_about = _hash_str(call_str.encode('utf-8'))
 
         self.last_result_path = CachePath(".minv", ci.name, str(ci.persistent_hash()))
         ci.output_paths.append(self.last_result_path)
