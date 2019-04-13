@@ -351,6 +351,6 @@ class ResponseNotAccepted(WatcherError):
     pass
 
 if six.PY2:
-    from .exc_old import reraise_with_context
+    from .exc_old import reraise_with_context  # noqa
 else:
-    from .exc_new import reraise_with_context
+    from .exc_new import reraise_with_context  # noqa

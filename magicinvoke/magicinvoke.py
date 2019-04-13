@@ -228,7 +228,9 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 # If explicitly ask us to traverse (with a path), but
                 # don't give ctx, what can we do?
                 # msg = "You gave path {!r} for {!r} args but 'ctx' (arg[0]) was {!r}.".format(path, func_name, ctx)
-                msg = "'ctx' (arg[0]) was {!r}. Cannot get dict from {} for args of {!r}.".format(ctx, user_passed_path, func_name)
+                msg = "'ctx' (arg[0]) was {!r}. Cannot get dict from {} for args of {!r}.".format(
+                    ctx, user_passed_path, func_name
+                )
                 raise DerivingArgsError(msg)
 
             path = func.ctx_path

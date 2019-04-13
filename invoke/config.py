@@ -5,7 +5,7 @@ import types
 from os.path import join, splitext, expanduser
 from pprint import pformat
 
-from .util import signature, six, yaml, raise_from
+from .util import signature, six, yaml
 
 if six.PY3:
     try:
