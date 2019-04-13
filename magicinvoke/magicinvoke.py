@@ -366,7 +366,7 @@ def _get_full_name(func):
 
 
 def _hash_str(obj):
-    return hashlib.sha224(str(obj).encode("utf-8")).hexdigest()
+    return hashlib.sha224(bytes(obj)).hexdigest()
 
 
 def _hash_int(obj):
@@ -379,6 +379,7 @@ class CallInfo(object):
 
     def __init__(self, func):
         self.name = _get_full_name(func)
+        self.code_hash = _hash_int(func.__code__.co_code)
         sig = signature(func)
         self.sig = sig
         self.params_that_are_filenames = []
@@ -428,9 +429,10 @@ class CallInfo(object):
         return self
 
     def identify(self):
-        return [self.name, self.input_paths, self.output_paths, self.flags]
+        """Things that make this call to the function unique."""
+        return [self.name, self.input_paths, self.output_paths, self.flags, self.code_hash]
 
-    def __hash__(self):
+    def persistent_hash(self):
         return sum(_hash_int(x) for x in self.identify())
 
     def _to_list_if_not_already(self, val):
