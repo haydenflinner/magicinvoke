@@ -38,7 +38,7 @@ def args_kwargs(ctx):
 
 
 def expand_ctx(ctx):
-    ctx = Context(Config({"magic.test_task": {"x": 1, "y": 2}}))
+    ctx = Context(Config({"magic": {"test_task": {"x": 1, "y": 2}}}))
 
     @magictask
     def test_task(ctx, x, y=None):
