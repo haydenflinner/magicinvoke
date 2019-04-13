@@ -42,6 +42,9 @@ adds support for lots of goodies:
   or a Py3-specific, more advanced 
   :ref:`make-replacement`.
 
+  Note that chaining these is safer with pre/post feature of tasks, see
+  :ref:`skippable-warning`.
+
 
 * **Arbitrary task filtering!**
     Implements the ``skip_ifs`` argument for tasks, a rename of ``checks`` from
