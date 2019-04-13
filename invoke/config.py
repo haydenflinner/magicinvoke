@@ -29,7 +29,7 @@ else:
 
 
 from .env import Environment
-from .exceptions import UnknownFileType, UnpicklableConfigMember
+from .exceptions import UnknownFileType, UnpicklableConfigMember, reraise_with_context
 from .runners import Local
 from .terminals import WINDOWS
 from .util import debug
@@ -1375,5 +1375,5 @@ class Lazy(object):
         try:
             return eval(self.path)
         except Exception as e:
-            msg = "Exception while evalling {!r}".format(self.orig_path)
-            raise_from(type(e)(msg), e)
+            msg = "While evalling {!r}".format(self.orig_path)
+            reraise_with_context(e, msg)

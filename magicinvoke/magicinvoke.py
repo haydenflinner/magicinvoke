@@ -19,6 +19,7 @@ from invoke.vendor.six.moves import filterfalse
 from invoke import Collection, task, Lazy, run  # noqa
 from invoke.tasks import Task
 from invoke.vendor.decorator import decorate
+from invoke.exceptions import reraise_with_context
 
 import cachepath  # noqa Add .rm to Paths
 from cachepath import CachePath
@@ -253,11 +254,10 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 try:
                     looking_in = looking_in[key]
                 except Exception as e:
-                    raise_from(
-                        DerivingArgsError(
-                            "{} while traversing path {!r} for {}() args.".format(repr(e), path, func_name)
-                        ),
-                        e
+                    reraise_with_context(
+                        e,
+                        "while traversing path {!r} for {}() args.".format(repr(e), path, func_name),
+                        DerivingArgsError
                     )
             return looking_in
 
@@ -297,11 +297,12 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 except Exception as e:
                     if type(e) is DerivingArgsError:
                         raise
-                    raise_from(DerivingArgsError(
+                    reraise_with_context(
+                        e,
                         "in {!r} step of deriving args for param {!r} of {}()".format(
                             p.__name__, param_name, func_name
-                        )),
-                        e
+                        ),
+                        DerivingArgsError
                     )
                 if passing is not fell_through:
                     debug("Received value {:.25}... from {!r} for {!r}".format(str(passing), p.__name__, param_name))
@@ -458,16 +459,15 @@ class CallInfo(object):
                 except (ValueError, TypeError) as e:
                     msg = (
                         "Received invalid path {!r} "
-                        "for path-taking parameter {!r}.".format(p, name)
+                        "for path-taking parameter {!r} of {}().".format(p, name, self.name)
                     )
-                    # Somewhat complex logic here to allow None paths vs regular paths
+                    # Somewhat complex logic here to allow optional (None) paths as well as required paths,
                     # while not having function mistakenly skipped.
                     if not p:
                         debug(msg)
                         rejected_values.append(p)
                     else:
                         raise type(e)(msg)
-                        # raise_from(type(e)(msg), e)
             if rejected_values:
                 params_change_behavior.append((name, rejected_values))
 
