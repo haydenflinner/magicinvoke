@@ -11,6 +11,7 @@ import textwrap
 from .util import six
 
 from . import Collection, Config, Executor, FilesystemLoader
+from .config import names_for_ctx, Lazy
 from .completion.complete import complete, print_completion_script
 from .parser import Parser, ParserContext, Argument
 from .exceptions import UnexpectedExit, CollectionNotFound, ParseError, Exit
@@ -331,8 +332,8 @@ class Program(object):
 
     def load_defines(self):
         merging_dict = self.config
-        for value in self.args.define.value:
-            path, value = value.split("=")
+        for arg_value in self.args.define.value:
+            path, value = arg_value.split("=")
             # We could just bring in dotmap and then exec a .x.y.z assignment,
             # but that feels dirty
             working_dict = merging_dict
@@ -341,7 +342,22 @@ class Program(object):
                 if c not in working_dict:
                     working_dict[c] = {}
                 working_dict = working_dict[c]
-            working_dict[components[-1]] = value
+            try:
+                passing_dict = {name: self.config for name in names_for_ctx}
+                passing_dict['Lazy'] = Lazy
+                parsed_value = eval(
+                    value,
+                    {},
+                    passing_dict
+                )
+            except Exception as e:
+                debug("Ignoring exception while evalling -D {!r}: {!r}. Using {!r} as value.".format(
+                    arg_value,
+                    e,
+                    value
+                ))
+            parsed_value = value
+            working_dict[components[-1]] = parsed_value
 
     def run(self, argv=None, exit=True):
         """
