@@ -34,6 +34,7 @@ from .runners import Local
 from .terminals import WINDOWS
 from .util import debug
 
+names_for_ctx = ["c", "ctx", "cfg"]
 
 class DataProxy(object):
     """
@@ -1362,18 +1363,14 @@ class Lazy(object):
         if not path:
             raise ValueError("path can not be None or empty.")
         # Bug here if we replace something later in the path (not beginning) but oh well.
-        self.orig_path = path
-        path = path.replace(
-            "ctx.", "c."
-        )  # Allow both c. and ctx., but nothing else.
         self.path = path
 
     def __repr__(self):
-        return "Lazy({!r})".format(self.orig_path)
+        return "Lazy({!r})".format(self.path)
 
     def __call__(self, c):
         try:
-            return eval(self.path)
+            return eval(self.path, {}, {name: c for name in names_for_ctx})
         except Exception as e:
-            msg = "While evalling {!r}".format(self.orig_path)
+            msg = "While evalling {!r}".format(self.path)
             reraise_with_context(e, msg)

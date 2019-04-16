@@ -14,6 +14,7 @@ try:
 except:
     from pathlib2 import Path  # Py2
     from funcsigs import signature, Parameter
+from invoke.config import names_for_ctx
 from invoke.util import raise_from
 from invoke.vendor.six.moves import filterfalse
 from invoke import Collection, task, Lazy, run  # noqa
@@ -44,7 +45,6 @@ for x in ("debug",):
 if os.getenv("MAGICINVOKE_TEST_DEBUG"):
     globals()["debug"] = print
 
-names_for_ctx = ["c", "ctx"]
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     """
@@ -235,7 +235,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 
             path = func.ctx_path
             seq = path.split(".")
-            looking_in = ctx.config
+            looking_in = ctx.get('config', ctx)  # Gracefully handle Configs (not usual Contexts)
             seq.pop(0)
             while seq:
                 key = seq.pop(0)
@@ -345,7 +345,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
         p.replace(default=None) if p.default is p.empty else p
         for p in sig.parameters.values()
     ]
-    if not myparams or myparams[0].name not in ('c', 'ctx'):
+    if not myparams or myparams[0].name not in names_for_ctx:
         raise ValueError("Can't have a derive_kwargs_from_ctx function that doesn't have a context arg!")
     # Don't provide default for ctx
     myparams[0] = list(sig.parameters.values())[0]

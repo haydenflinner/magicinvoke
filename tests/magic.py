@@ -2,6 +2,7 @@ from magicinvoke import magictask, task, get_params_from_ctx
 from magicinvoke.exceptions import DerivingArgsError
 from cachepath import CachePath
 from invoke import Context, Config
+from invoke.config import Lazy
 import six
 
 import pytest
@@ -155,7 +156,7 @@ class test_nice_errors_for_skippables():
     def _raise_func(self, ctx):
         raise ValueError('good!')
 
-    def test1(self):
+    def test_raising_param_default(self):
         @get_params_from_ctx
         def myfunc(ctx, x=self._raise_func):
             return x
@@ -163,7 +164,7 @@ class test_nice_errors_for_skippables():
         with pytest.raises(DerivingArgsError):
             myfunc()
 
-    def test2(self):
+    def test_fail_to_pickle_exception(self):
         from magicinvoke.exceptions import SaveReturnvalueError
         @skippable
         def fail_to_pickle(x=lambda: None):
@@ -245,6 +246,13 @@ class test_nice_errors_for_skippables():
         p = CachePath('lol')
         assert build(p)
         assert not build(p, False)
+
+    def test_can_pass_cfg(self):
+        @get_params_from_ctx
+        def myfunc(cfg, x=Lazy('c.x')):
+            return x
+        assert myfunc(Config(defaults={'x': True}))
+
 
 
 # ------ Integration-y tests; run the examples
