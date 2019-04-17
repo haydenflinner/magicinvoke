@@ -356,7 +356,7 @@ class Program(object):
                     e,
                     value
                 ))
-            parsed_value = value
+                parsed_value = value
             working_dict[components[-1]] = parsed_value
 
     def run(self, argv=None, exit=True):
