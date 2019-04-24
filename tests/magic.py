@@ -83,6 +83,11 @@ def proper_order_false():
     r = test_task(ctx)
     assert not r
 
+def test_task_without_ctx():
+    @task(no_ctx=True)
+    def test_task():
+        return
+    assert test_task() is None
 
 def call_calls_pres():
     global_d = {}

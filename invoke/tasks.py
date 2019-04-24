@@ -56,6 +56,7 @@ class Task(object):
         autoprint=False,
         iterable=None,
         incrementable=None,
+        no_ctx=False,
     ):
         # Real callable
         self.body = body
@@ -69,6 +70,9 @@ class Task(object):
         self._name = name
         self.aliases = aliases or ()
         self.is_default = default
+        if no_ctx and (pre or post or skip_ifs):
+            raise ValueError("Tasks that have a pre/skip_ifs/post must have a ctx.")
+        self.no_ctx = no_ctx
         # Arg/flag/parser hints
         self.positional = self.fill_implicit_positionals(positional)
         self.optional = optional or ()
@@ -139,10 +143,12 @@ class Task(object):
 
     def __call__(self, *args, **kwargs):
         # Guard against calling tasks with no context.
-        if not args or not isinstance(args[0], Context):
+        if not self.no_ctx and (not args or not isinstance(args[0], Context)):
             err = "Task expected a Context as its first arg, got {} instead!"
             # TODO: raise a custom subclass _of_ TypeError instead
             raise TypeError(err.format(type(args[0]) if args else "no arg"))
+        if self.no_ctx and args and isinstance(args[0], Context):
+            args = args[1:]  # Slice off ctx
 
         called_by_executor = kwargs.pop("_called_by_executor", False)
         run = self.before_call(args, kwargs, called_by_executor)
@@ -154,7 +160,7 @@ class Task(object):
 
     def before_call(self, args, kwargs, called_by_executor=False):
         """Calls pres/skip_ifs/posts if not being called by Executor (i.e. as a Python function)"""
-        if called_by_executor:
+        if called_by_executor or self.no_ctx:
             return True
 
         ctx = args[0]
@@ -188,7 +194,7 @@ class Task(object):
         return not skipped_because
 
     def after_call(self, args, kwargs, called_by_executor=False):
-        if called_by_executor:
+        if called_by_executor or self.no_ctx:
             return True
         ctx = args[0]
         for task in self.post:
@@ -258,7 +264,7 @@ class Task(object):
             del spec_dict[context_arg]
         except IndexError:
             # TODO fix the tests so that this isn't necessary with better mocks.
-            if not self._is_mock(func):
+            if not self.no_ctx and not self._is_mock(func):
                 # Dumbest imaginable way to skip this check on Mocks.
                 # TODO: see TODO under __call__, this should be same type
                 raise TypeError("Tasks must have an initial Context argument!")
