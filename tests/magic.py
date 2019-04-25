@@ -202,7 +202,7 @@ class test_nice_errors_for_skippables():
             pass
         with pytest.raises(TypeError) as exc:
             myfunc(Context())
-        assert "myfunc' did not receive required positional arguments: 'x'" in str(exc)
+        assert "myfunc' did not receive required positional arguments: x" in str(exc)
 
     def test_bad_path_to_skippable(self):
         @skippable
