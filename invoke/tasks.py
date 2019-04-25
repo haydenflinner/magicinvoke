@@ -7,7 +7,6 @@ from collections import namedtuple
 from copy import deepcopy
 import types
 
-from .exceptions import reraise_with_context
 from .util import debug, signature, six, log
 
 from .config import Config

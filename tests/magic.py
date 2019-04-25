@@ -178,7 +178,7 @@ class test_nice_errors_for_skippables():
         # To test error msgs
         # @task
         # def myfunc(cfg, x=Lazy('ctx.x')):
-            # raise ValueError("crap")
+        # raise ValueError("crap")
         # myfunc(Config())
 
     def test_fail_to_pickle_exception(self):
