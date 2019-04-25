@@ -321,14 +321,8 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             msg = "{!r} did not receive required positional arguments: {}".format(
                 func_name,
                 ", ".join(
-                    repr(p_name)
-                    for p_name, p in list(sig.parameters.items())[1:]
-                    if (
-                        p.kind is p.POSITIONAL_ONLY
-                        or p.kind is p.POSITIONAL_OR_KEYWORD
-                    )
-                    and p_name not in ba.arguments
-                ),
+                    missing
+                )
             )
             raise TypeError(msg)
 
