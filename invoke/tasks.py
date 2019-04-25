@@ -7,8 +7,10 @@ from collections import namedtuple
 from copy import deepcopy
 import types
 
-from .util import debug, signature, six
+from .exceptions import reraise_with_context
+from .util import debug, signature, six, log
 
+from .config import Config
 from .context import Context
 from .parser import Argument, translate_underscores
 
@@ -142,18 +144,32 @@ class Task(object):
         return hash(self.name) + hash(self.body)
 
     def __call__(self, *args, **kwargs):
+        # If someone passes us a Config, since it's basically the same as a Context,
+        # just make it one.
+        if not self.no_ctx and args and isinstance(args[0], Config):
+            args = list(args)
+            args[0] = Context(args[0])
         # Guard against calling tasks with no context.
         if not self.no_ctx and (not args or not isinstance(args[0], Context)):
             err = "Task expected a Context as its first arg, got {} instead!"
             # TODO: raise a custom subclass _of_ TypeError instead
             raise TypeError(err.format(type(args[0]) if args else "no arg"))
+
         if self.no_ctx and args and isinstance(args[0], Context):
-            args = args[1:]  # Slice off ctx
+            args = args[1:]  # Slice off ctx to allow uniform calling of tasks
 
         called_by_executor = kwargs.pop("_called_by_executor", False)
         run = self.before_call(args, kwargs, called_by_executor)
         if run:
-            result = self.body(*args, **kwargs)
+            try:
+                result = self.body(*args, **kwargs)
+            except Exception as e:
+                # Shouldn't be necessary, but I have seen stacktraces that have
+                # no indicator of where the problem started..
+                log.error("{} while calling {}()".format(
+                    e.__class__.__name__, self.name)
+                )
+                raise
         self.times_called += 1
         self.after_call(args, kwargs, called_by_executor)
         return result

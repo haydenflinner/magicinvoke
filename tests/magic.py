@@ -168,6 +168,18 @@ class test_nice_errors_for_skippables():
 
         with pytest.raises(DerivingArgsError):
             myfunc()
+    def test_config_instead_context(self):
+        @task
+        @get_params_from_ctx
+        def myfunc(cfg, x=Lazy('ctx.x')):
+            return x
+        assert myfunc(Config(defaults={'x': True})) is True
+
+        # To test error msgs
+        # @task
+        # def myfunc(cfg, x=Lazy('ctx.x')):
+            # raise ValueError("crap")
+        # myfunc(Config())
 
     def test_fail_to_pickle_exception(self):
         from magicinvoke.exceptions import SaveReturnvalueError
