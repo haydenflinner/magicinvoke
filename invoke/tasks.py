@@ -121,6 +121,10 @@ class Task(object):
         return "<Task {!r}{}>".format(self.name, aliases)
 
     def __eq__(self, other):
+        if not hasattr(other, 'name'):
+            # Prevent AttributeError: type object 'type' has no attribute 'name'
+            # When compared with non-tasks
+            return False
         if self.name != other.name:
             return False
         # Functions do not define __eq__ but func_code objects apparently do.
