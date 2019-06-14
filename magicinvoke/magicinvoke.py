@@ -7,6 +7,7 @@ import hashlib
 import itertools
 import logging
 import pickle
+from textwrap import dedent
 
 try:
     from pathlib import Path  # Py3
@@ -425,11 +426,11 @@ class CallInfo(object):
         return self
 
     def identify(self):
-        """Things that make this call to the function unique."""
+        """Things that make this function call unique."""
         yield self.name
         for x in itertools.chain(self.input_paths, self.output_paths, self.flags):
             yield str(x)
-        yield self.code_hash
+        yield self.code_hash  # This is what should cause code to re-run if modified
 
     def persistent_hash(self):
         return sum(_hash_int(x.encode('utf-8')) for x in self.identify())
@@ -448,6 +449,14 @@ class CallInfo(object):
         else:
             return val
 
+    type_check_help = dedent("""
+    Add a '_' to beginning of parameter {}'s name to avoid this type-check
+    Error, but know that paths passed to _parameters won't have their timestamps
+    checked against input path timestamps. This should work fine for functions
+    with a simple input -> output dependency; each function stores its last-run
+    time in a separate file that caches the return value.
+    """).replace('\n', ' ')
+
     def _coerce_paths(self, param_names, params_change_behavior):
         returning_paths = []
         for name in param_names:
@@ -460,7 +469,7 @@ class CallInfo(object):
                     returning_paths.append(Path(p))
                 except (ValueError, TypeError) as e:
                     msg = (
-                        "Received invalid path {!r} "
+                        "Received invalid path: {!r} \n"
                         "for path-taking parameter {!r} of {}().".format(p, name, self.name)
                     )
                     # Somewhat complex logic here to allow optional (None) paths as well as required paths,
@@ -469,6 +478,7 @@ class CallInfo(object):
                         debug(msg)
                         rejected_values.append(p)
                     else:
+                        msg = msg + '\n' + self.type_check_help.format(name)
                         raise type(e)(msg)
             if rejected_values:
                 params_change_behavior.append((name, rejected_values))
@@ -532,6 +542,7 @@ class FileFlagChecker(object):
                 and flags_path.read_bytes().decode() != self.care_about
             ):
                 failed_path = output_path
+                break
         can_skip = not failed_path
         return SkipResult(
             can_skip,
@@ -571,20 +582,27 @@ class FileFlagChecker(object):
             pickle.dump(ci.result, self.last_result_path.open("wb"))
         except Exception as e:
             raise SaveReturnvalueError(*e.args)
-        debug(
-            "Done logging return value {!r} to {}".format(
-                ci.result, self.last_result_path
+        log.info(
+            "Done logging return value {!r} for {}() to {}. ".format(
+                ci.result, ci.name, self.last_result_path
             )
+        )
+        log.debug(
+            "Path should be unique by combo of function name + arguments + "
+            "hash of function's __code__."
         )
 
     def load(self, ci):
-        debug(
+        log.info(
             "Loading return value for {!r} from {!r}".format(
                 ci.name, self.last_result_path
             )
         )
         return pickle.load(self.last_result_path.open("rb"))
 
+
+def _is_task(o):
+    return isinstance(o, Task)
 
 def skippable(func, *args, **kwargs):
     """
@@ -676,6 +694,11 @@ def skippable(func, *args, **kwargs):
     myparams["_force_run"] = Parameter(
         name="_force_run", kind=Parameter.KEYWORD_ONLY, default=False
     )
+    if _is_task(func):
+        name = func.__name__
+        raise TypeError("@skippable must be applied to a function, not a Task. "
+                        "That is, do @task @skippable {}() rather than "
+                        "@skippable @task {}()".format(name, name))
     func.__signature__ = sig.replace(parameters=myparams.values())
 
     return decorate(func, _skippable)
@@ -690,7 +713,7 @@ def _skippable(func, *args, **kwargs):
     clean = kwargs.pop("_clean", False)
 
     if clean:
-        debug("Cleaning {!r}: {!r}!".format(ci.name, ci.output_paths))
+        log.info("Cleaning {!r}: {!r}!".format(ci.name, ci.output_paths))
         for p in ci.output_paths:
             p.rm()
         func.checker.clean(ci)
@@ -726,8 +749,7 @@ def _skippable(func, *args, **kwargs):
             # Never seen this happen, but I imagine we would rather degrade
             # to calling the function again rather than quitting or returning
             # a bad value.
-            debug("Failed to load cached result for {!r}.".format(ci.name))
-            debug(e)
+            log.warning("Failed to load cached result for {!r}: {}".format(ci.name, e))
 
     ci.result = func(*args, **kwargs)
     func.checker.after_run(ci)
