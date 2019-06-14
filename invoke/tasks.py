@@ -169,9 +169,11 @@ class Task(object):
             except Exception as e:
                 # Shouldn't be necessary, but I have seen stacktraces that have
                 # no indicator of where the problem started..
-                log.error("{} while calling {}()".format(
+                log.exception("{} while calling {}()".format(
                     e.__class__.__name__, self.name)
                 )
+                if "'_force_run'" in str(e) or "'_clean'" in str(e):
+                    raise type(e)("--force-run and --clean are not supported in Python 2.")
                 raise
         self.times_called += 1
         self.after_call(args, kwargs, called_by_executor)
