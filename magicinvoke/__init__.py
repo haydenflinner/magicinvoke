@@ -13,6 +13,9 @@ from .magicinvoke import (  # noqa
     InputPath,
     Lazy,
     OutputPath,
+
+    # In case you need to run tests with capture=no
+    _disable_logging_for_tests,
 )
 from . import exceptions  # noqa
 

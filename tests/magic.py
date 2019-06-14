@@ -1,4 +1,4 @@
-from magicinvoke import magictask, task, get_params_from_ctx
+from magicinvoke import magictask, task, get_params_from_ctx, _disable_logging_for_tests
 from magicinvoke.exceptions import DerivingArgsError
 from cachepath import CachePath
 from invoke import Context, Config
@@ -7,6 +7,8 @@ import six
 
 import pytest
 
+
+_disable_logging_for_tests()
 
 def forgot_ctx():
     with pytest.raises(TypeError):

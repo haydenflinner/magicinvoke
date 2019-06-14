@@ -46,6 +46,10 @@ for x in ("debug",):
 if os.getenv("MAGICINVOKE_TEST_DEBUG"):
     globals()["debug"] = print
 
+def _disable_logging_for_tests():
+    log.setLevel(logging.CRITICAL)
+    logging.getLogger("invoke").setLevel(logging.CRITICAL)
+
 
 def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
     """
