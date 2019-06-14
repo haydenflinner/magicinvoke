@@ -474,7 +474,7 @@ class CallInfo(object):
                     )
                     # Somewhat complex logic here to allow optional (None) paths as well as required paths,
                     # while not having function mistakenly skipped.
-                    if not p:
+                    if not p or isinstance(p, bool):
                         debug(msg)
                         rejected_values.append(p)
                     else:
