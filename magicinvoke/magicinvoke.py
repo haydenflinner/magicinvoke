@@ -829,7 +829,7 @@ def get_directly_passed(func, sig, args, kwargs):
         # inspect already has _too_many, but only for getcallargs.
         # Which is basically what this is. So, port getcallargs
         # to funcsigs, use it?
-        if "too many" in e.args[0]:
+        if "too many" in e.args[0] and not 'keyword' in e.args[0]:
             msg = "{}{} takes {} arguments but {} were given".format(
                 func.__name__,
                 sig,
@@ -845,8 +845,8 @@ def get_directly_passed(func, sig, args, kwargs):
                 len(args) + len(kwargs),
             )
             raise_from(TypeError(msg), e)
-        elif "unexpected keyword" in e.args[0]:
-            msg = "{!r} {}".format(func.__name__, e.args[0])
+        elif "unexpected keyword" in e.args[0] or 'too many keyword' in e.args[0]:
+            msg = "{!r} received {}".format(func.__name__, e.args[0])
             # from None -- handy trick to get rid of that crappy default error
             raise_from(TypeError(msg), None)
         raise
