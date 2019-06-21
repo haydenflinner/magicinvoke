@@ -323,11 +323,13 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                 missing.append(param.name)
         # TODO contribute these improved error messages back to funcsigs
         if missing:
-            msg = "{!r} did not receive required positional arguments: {}".format(
+            msg = ("{!r} did not receive required positional arguments: {!r}. "
+            "Looked in arguments passed directly to function and then {!r}.").format(
                 func_name,
                 ", ".join(
                     missing
-                )
+                ),
+                '{}.{}'.format(func.ctx_path, param_name)
             )
             raise TypeError(msg)
 
