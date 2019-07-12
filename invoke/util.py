@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, Iterable
 from contextlib import contextmanager
 import io
 import logging
@@ -292,3 +292,9 @@ class ExceptionHandlingThread(threading.Thread):
 ExceptionWrapper = namedtuple(
     "ExceptionWrapper", "kwargs type value traceback"
 )
+
+def is_iterable(arg):
+    return (
+        isinstance(arg, Iterable)
+        and not isinstance(arg, six.string_types)
+    )

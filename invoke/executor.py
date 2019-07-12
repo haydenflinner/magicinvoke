@@ -2,7 +2,7 @@ from .util import six
 
 from .config import Config
 from .parser import ParserContext
-from .util import debug
+from .util import debug, is_iterable
 from .tasks import Call, Task
 
 
@@ -35,6 +35,26 @@ class Executor(object):
         self.collection = collection
         self.config = config if config is not None else Config()
         self.core = core
+
+    def _print_result(self, autoprint, result):
+        """Feel free to monkey-patch override this with your own formatting preferences."""
+        if autoprint == 'unix':
+            if result is None:
+                return
+            if isinstance(result, dict):
+                for k, v in result.items():
+                    # Just use cut, if you have tabs use json and jq.
+                    print("{}\t{}".format(k, v))
+            elif is_iterable(result):
+                for item in result:
+                    print(item)
+            else:
+                print(result)
+        elif autoprint == 'json':
+            import json
+            print(json.dumps(result, indent=2))
+        else:
+            print(result)
 
     def execute(self, *tasks):
         """
@@ -111,12 +131,14 @@ class Executor(object):
         for c in calls:
 
             def run_call(call):
-                autoprint = call in direct and call.autoprint
-                args = call.args
                 debug("Executing {!r}".format(call))
+                config = self.config
+                args = call.args
+                # Allow 'autoprint' in config ('inv -D autoprint=unix task') to
+                # take precedence over function-level autoprint.
+                autoprint = call in direct and config.get('autoprint', call.autoprint)
                 # Hand in reference to our config, which will preserve user
                 # modifications across the lifetime of the session.
-                config = self.config
                 # But make sure we reset its task-sensitive levels each time
                 # (collection & shell env)
                 # TODO: load_collection needs to be skipped if task is anonymous
@@ -144,7 +166,7 @@ class Executor(object):
                     *args, _called_by_executor=True, **call.kwargs
                 )
                 if autoprint:
-                    print(result)
+                    self._print_result(autoprint, result)
                 # TODO: handle the non-dedupe case / the same-task-different-args
                 # TODO: REMOVEME - Is ^^ comment still accurate?
                 # case, wherein one task obj maps to >1 result.
