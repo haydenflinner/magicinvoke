@@ -258,7 +258,7 @@ class ParseMachine(StateMachine):
         ):
             debug("Saw inverse flag {!r}".format(token))
             self.switch_to_flag(token, inverse=True)
-        # Value for current flag
+        # Value for current flag, since it's not a flag
         elif self.waiting_for_flag_value:
             debug(
                 "We're waiting for a flag value so {!r} must be it?".format(
@@ -267,9 +267,12 @@ class ParseMachine(StateMachine):
             )  # noqa
             self.see_value(token)
         elif self.flag and not self.flag.takes_value and self.context.eat_all and not self.flag_got_value:
-            # We add Arguments as not taking flags initially to allow boolean kwargs.
-            # Now, we've found a value, so call into see_value.
-            debug("H: Setting flag {!r} to value {!r}".format(self.flag, token))
+            # If this case matches, we've exhausted our required positional args and we're parsing a string arg
+            # which looks like a value (doesn't start with --)
+            # for a task which takes **kwargs. An Argument for the previous '--flag' has already been added,
+            # marked boolean/optional so that it doesn't require a value to continue.
+            # So, just set the value, turning off cast so that it doesn't get turned into a bool.
+            debug("Setting kwarg {!r} to value {!r}".format(self.flag, token))
             self.flag.set_value(token, cast=False)
             self.flag_got_value = True
         # Positional args (must come above context-name check in case we still
@@ -420,6 +423,7 @@ class ParseMachine(StateMachine):
                 # But only an edgecase if you try to pass --x and -x at once,
                 # and that can only happen with single letter param name, so screw it.
                 flag = "-" + flag[2]
+            # Add as optional bool at first, we'll later give it a value if we find one.
             self.context.add_arg(Argument(name=flag.lstrip("-"), kind=bool, optional=True))
 
         self.flag = self.context.flags[flag]
