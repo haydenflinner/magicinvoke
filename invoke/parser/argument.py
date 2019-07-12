@@ -1,3 +1,5 @@
+from ..config import Lazy
+
 class Argument(object):
     """
     A command-line argument/flag.
@@ -143,7 +145,8 @@ class Argument(object):
         # Default to do-nothing/identity function
         func = lambda x: x
         # If cast, set to self.kind, which should be str/int/etc
-        if cast:
+        if cast and self.kind is not Lazy:
+            # If don't check self.kind == Lazy, will pass Lazy('user-provided-value') to tasks which use Lazy
             func = self.kind
         # If self.kind is a list, append instead of using cast func.
         if self.kind is list:
