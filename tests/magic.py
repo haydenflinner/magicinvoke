@@ -281,7 +281,7 @@ class test_nice_errors_for_skippables():
         (
             "args-kwargs",
             "invoke myfunc arg0 arg1 --key value --flag --flag2",
-            "args: ('arg0', 'arg1')\nkwargs: {'key': 'value', 'flag': True, 'flag2': True}",
+            "args: ('arg0', 'arg1')\nkwargs: {'flag': True, 'flag2': True, 'key': 'value'}",
             False,
         ),
         (

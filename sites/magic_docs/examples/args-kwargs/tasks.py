@@ -1,5 +1,6 @@
 from __future__ import print_function
 from invoke import task
+from pprint import pformat
 
 
 @task
@@ -14,4 +15,5 @@ def myfunc(ctx, *args, **kwargs):
     Keyword optional args work but they can be filled by positional args
     (because they're not KEYWORD_ONLY!) so we don't recommend their use.
     """
-    print("args: {}\nkwargs: {}".format(args, kwargs))
+    print("args: {}".format(args))
+    print("kwargs: {}".format(pformat(kwargs)))

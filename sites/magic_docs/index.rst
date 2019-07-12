@@ -75,6 +75,12 @@ adds support for lots of goodies:
 
   `Longer explanation here. <https://github.com/pyinvoke/invoke/pull/613>`_
 
+* Autoprint styles + overriding from cmd-line::
+
+    @task(autoprint='unix')  # Prints lists new-line-separated, dicts tab-separated
+    @task(autoprint='json')  # Duh
+
+  Includes ability to set autoprint without modifying tasks: `inv -D autoprint=unix my-task-name`
 
 * **Bugfixes**
 
