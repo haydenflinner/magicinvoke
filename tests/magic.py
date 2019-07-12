@@ -278,7 +278,7 @@ class test_nice_errors_for_skippables():
 @pytest.mark.parametrize(
     "folder, cmd, expected_output, py2_only",
     [
-        ("args-kwargs", "invoke myfunc x --z 1", "('x',) {'z': '1'}\n", False),
+        ("args-kwargs", "invoke myfunc arg0 arg1 --key value --flag --flag2", "args: ('arg0', 'arg1')\nkwargs: {'key': 'value', 'flag': True, 'flag2': True}", False),
         (
             "data-pipeline",
             "pytest --capture=no -k test_this",

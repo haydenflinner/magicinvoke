@@ -133,7 +133,13 @@ class Executor(object):
                 context = call.make_context(config)
                 # TODO 531 figure out why args is always blank here + how to
                 # space out *args past regular named args
-                args = (context,) + args + tuple(call.varargs)
+                args = (context,) + args # + tuple(call.varargs)
+                if call.vararg_name and call.varargs:
+                    # call.kwargs[call.vararg_name] = tuple(call.varargs)
+                    # ^ Doesn't get unpacked like you might expect it to (in Py2 at least)
+                    # We could also just not allow *args;
+                    # that would allow positional args and can get *args from kwargs['varargs']
+                    args = args + tuple(call.varargs)
                 result = call.task(
                     *args, _called_by_executor=True, **call.kwargs
                 )

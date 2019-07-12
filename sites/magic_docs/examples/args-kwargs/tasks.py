@@ -4,10 +4,14 @@ from invoke import task
 
 @task
 def myfunc(ctx, *args, **kwargs):
-    """Note there is a bug where we couldn't do
-    def mine(ctx, myvar, *args, **kwargs):
-
-    But something is better than nothing :) Search "todo args"
-    to find the comment describing my expected fix.
     """
-    print(args, kwargs)
+    Note there is a bug where we couldn't do
+       def mine(ctx, mypositionalarg, *args, **kwargs):
+           pass
+
+    But something is better than nothing :) Search "TODO 531"
+    to find the comment describing our options.
+    Keyword optional args work but they can be filled by positional args
+    (because they're not KEYWORD_ONLY!) so we don't recommend their use.
+    """
+    print("args: {}\nkwargs: {}".format(args, kwargs))

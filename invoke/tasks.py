@@ -290,6 +290,7 @@ class Task(object):
                 # TODO: see TODO under __call__, this should be same type
                 raise TypeError("Tasks must have an initial Context argument!")
 
+        self.vararg_name = special.varargs
         return arg_names, spec_dict, special
 
     def _is_mock(self, func):

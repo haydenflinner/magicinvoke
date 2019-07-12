@@ -266,6 +266,12 @@ class ParseMachine(StateMachine):
                 )
             )  # noqa
             self.see_value(token)
+        elif self.flag and not self.flag.takes_value and self.context.eat_all and not self.flag_got_value:
+            # We add Arguments as not taking flags initially to allow boolean kwargs.
+            # Now, we've found a value, so call into see_value.
+            debug("H: Setting flag {!r} to value {!r}".format(self.flag, token))
+            self.flag.set_value(token, cast=False)
+            self.flag_got_value = True
         # Positional args (must come above context-name check in case we still
         # need a posarg and the user legitimately wants to give it a value that
         # just happens to be a valid context name.)
@@ -355,6 +361,8 @@ class ParseMachine(StateMachine):
             debug(msg.format(self.flag.name))
             # Skip casting so the bool gets preserved
             self.flag.set_value(True, cast=False)
+        if self.flag:
+            debug("Completed flag {}".format(self.flag))
 
     def check_ambiguity(self, value):
         """
@@ -412,7 +420,7 @@ class ParseMachine(StateMachine):
                 # But only an edgecase if you try to pass --x and -x at once,
                 # and that can only happen with single letter param name, so screw it.
                 flag = "-" + flag[2]
-            self.context.add_arg(Argument(name=flag.lstrip("-")))
+            self.context.add_arg(Argument(name=flag.lstrip("-"), kind=bool, optional=True))
 
         self.flag = self.context.flags[flag]
         debug("Moving to flag {!r}".format(self.flag))
