@@ -246,7 +246,11 @@ class ParseMachine(StateMachine):
             return
         # Flag
         if self.context and (
+            # Usual case, --abc-xyz
             token in self.context.flags
+            # Hack to allow --args_like_this
+            or is_long_flag(token) and translate_underscores(token) in self.context.flags
+           # Only when function takes kwargs
             or self.context.eat_all
             and is_flag(token)
         ):
@@ -310,7 +314,8 @@ class ParseMachine(StateMachine):
         else:
             if not self.ignore_unknown:
                 debug("Can't find context named {!r}, erroring".format(token))
-                if '--' in token:  # Probably a flag. Should we also do this error for posargs?
+                # Should we also do this error for posargs? Can't know whether posarg or task, leave the original err
+                if is_flag(token):
                     self.error("Task {!r} does not take an argument {!r}, only {}".format(
                         self.context.name,
                         token,
@@ -411,14 +416,15 @@ class ParseMachine(StateMachine):
         # Set flag/arg obj
         flag = self.context.inverse_flags[flag] if inverse else flag
         # Update state
-        if flag not in self.context.flags:
+        # translate_underscores only necessary because of magicinvoke#2 GitHub. Also for args_like_this hack
+        if translate_underscores(flag) not in self.context.flags:
             if not self.context.eat_all:
                 # TODO 378 other possibilities?
-                raise ParseError("Received unknown flag")
+                raise ParseError("Received unknown flag: {!r}".format(flag))
 
             if (
                 self.context.eat_all
-                and flag.startswith("--")
+                and is_long_flag(flag)
                 and len(flag) == 3
             ):
                 # --x to -x
@@ -434,7 +440,6 @@ class ParseMachine(StateMachine):
             name = flag.lstrip("-")
             self.context.add_arg(Argument(name=translate_underscores(name), attr_name=name, kind=bool, optional=True))
 
-        # translate_underscores only necessary because of magicinvoke#2 GitHub
         self.flag = self.context.flags[translate_underscores(flag)]
         debug("Moving to flag {!r}".format(self.flag))
         # Bookkeeping for iterable-type flags (where the typical 'value

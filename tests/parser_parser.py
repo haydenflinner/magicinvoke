@@ -289,6 +289,9 @@ class Parser_:
                     Argument(
                         names=("foo", "f"), optional=True, default="mydefault"
                     ),
+                    Argument(
+                        names=("long-arg", "l"), optional=True, default="mydefault", attr_name="long_arg"
+                    )
                 )
             self.context = Context("mytask", args=arguments)
             self.parser = Parser([self.context])
@@ -300,7 +303,11 @@ class Parser_:
 
         def _expect(self, argstr, expected, parser=None):
             result = self._parse(argstr, parser)
-            assert result[0].args.foo.value == expected
+            assert (
+                result[0].args.foo.value == expected
+                or
+                result[0].args.long_arg.value == expected
+            )
 
         def no_value_becomes_True_not_default_value(self):
             self._expect("--foo", True)
@@ -310,6 +317,8 @@ class Parser_:
             for argstr in (
                 "--foo whatever",
                 "--foo=whatever",
+                "--long-arg=whatever",
+                "--long_arg=whatever",
                 "-f whatever",
                 "-f=whatever",
             ):
