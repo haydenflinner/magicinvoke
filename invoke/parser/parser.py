@@ -310,6 +310,12 @@ class ParseMachine(StateMachine):
         else:
             if not self.ignore_unknown:
                 debug("Can't find context named {!r}, erroring".format(token))
+                if '--' in token:  # Probably a flag. Should we also do this error for posargs?
+                    self.error("Task {!r} does not take an argument {!r}, only {}".format(
+                        self.context.name,
+                        token,
+                        ', '.join(repr(x) for x in self.context.flags.keys())
+                    ))
                 self.error("No idea what {!r} is!".format(token))
             else:
                 debug("Bottom-of-handle() see_unknown({!r})".format(token))
