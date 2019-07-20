@@ -10,6 +10,7 @@ except ImportError:
 from ..util import debug
 from ..exceptions import ParseError
 from .argument import Argument
+from .context import translate_underscores
 
 
 def is_flag(value):
@@ -424,9 +425,11 @@ class ParseMachine(StateMachine):
                 # and that can only happen with single letter param name, so screw it.
                 flag = "-" + flag[2]
             # Add as optional bool at first, we'll later give it a value if we find one.
-            self.context.add_arg(Argument(name=flag.lstrip("-"), kind=bool, optional=True))
+            name = flag.lstrip("-")
+            self.context.add_arg(Argument(name=translate_underscores(name), attr_name=name, kind=bool, optional=True))
 
-        self.flag = self.context.flags[flag]
+        # translate_underscores only necessary because of magicinvoke#2 GitHub
+        self.flag = self.context.flags[translate_underscores(flag)]
         debug("Moving to flag {!r}".format(self.flag))
         # Bookkeeping for iterable-type flags (where the typical 'value
         # non-empty/nondefault -> clearly it got its value already' test is
