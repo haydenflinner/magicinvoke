@@ -42,6 +42,7 @@ def test_this(ctx):
     def both_ran(stdout):
         assert both_stdout.strip() == stdout.strip()
 
+    # Remove minv cache.
     if six.PY2:
         CachePath('.minv').rm()
         Path('.minv').rm()
@@ -51,6 +52,8 @@ def test_this(ctx):
     def bprint(s):
         print(Style.BRIGHT + s + Style.RESET_ALL)
 
+    # Now actually start the test. We run get-people just to seed the file,
+    # it shouldn't show up in actual @skippable testing in a few lines.
     bprint("Everything should run from scratch.")
     if six.PY2:
         Path('people.txt').rm()
@@ -58,6 +61,7 @@ def test_this(ctx):
     else:
         assert "Wrote" in ctx.run("inv get-people --force-run").stdout.strip()
 
+    # If get-people still runs here, it means caching for skippable doesn't work.
     both_ran(ctx.run("invoke print-peoples-ages").stdout)
     only_print_ran(ctx.run("invoke print-peoples-ages").stdout)
 

@@ -375,14 +375,28 @@ def _hash_str(obj):
 def _hash_int(obj):
     return int(_hash_str(obj), 16)
 
-
 class CallInfo(object):
     def __repr__(self):
         return "CallInfo({!r})".format(self.name)
 
     def __init__(self, func):
         self.name = _get_full_name(func)
-        self.code_hash = _hash_str(func.__code__.co_code)
+        # HACK When you modify, say, a string literal within a function,
+        # co_code doesn't change. It's not clear to me how we can detect this sort of thing:
+        #  @skippable myfunc(): return run_cmd("string here")
+        # Where the string changes but the length doesn't change.
+        # So, we use lnotab with the hope that if you change one of these strings
+        # it will be at least one character shorter or longer than it was.
+        # https://svn.python.org/projects/python/branches/pep-0384/Objects/lnotab_notes.txt
+        # Also, we can't just hash func.__code__ as its hash changes each time the interpreter restarts.
+        self.code_hash = (
+            # We're not adding ints here, we're concatting strings!
+            # This results in hashes that are twice as long,
+            # although I don't think the second half is contributing as much to the uniqueness as the bytecode does.
+            # Could also use co_firstlineno or timestamp modified of the source file.
+            _hash_str(func.__code__.co_code)
+            + _hash_str(func.__code__.co_lnotab)
+        )
         sig = signature(func)
         self.sig = sig
         self.params_that_are_filenames = []

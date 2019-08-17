@@ -8,7 +8,7 @@ adds support for lots of goodies:
 * ``*args`` **and** ``**kwargs`` **support!**
   See how easy it is here: :ref:`args-kwargs`. 
 
-* **Automatic filling of parameters from ctx!**
+* **Automatic parameter defaults from ctx!**
   Have you ever wondered why you can put ``'run': {'echo': True}`` in
   ``invoke.yaml`` and suddenly ``echo=True`` gets passed to all
   ``ctx.run`` s, but you can't do the same for your own tasks?
@@ -35,7 +35,17 @@ adds support for lots of goodies:
         # file was last generated with same 'flag' values like 'debug' arg.
         ctx.run('gcc {} -o {}'.format(' '.join(input_c_files), output_executable))
 
-  For API doc, see :meth:`magicinvoke.skippable`. 
+  For API doc, see :meth:`magicinvoke.skippable`.
+    Note that aside from re-running based on input/output file timestamps,
+    ``@skippable`` also attempts to detect changes to the source of your
+    function. We cannot catch all changes that affect your function output,
+    but we record the hash of two things to determine that your function has
+    remained unchanged since last run:
+    The compiled bytecode
+    and the number of parsed characters on each line of the source.
+    So, if you want to ensure a function is re-run,
+    just add a comment within it on a new line!
+
 
   For more examples, check out a basic
   :ref:`data-pipeline`.
@@ -60,6 +70,20 @@ adds support for lots of goodies:
       def never_runs(ctx):
           print("Never happens!")
 
+* **Autoprint styles + overriding from cmd-line**::
+
+    @task(autoprint='unix')  # Prints lists new-line-separated, dicts tab-separated
+    @task(autoprint='json')  # Pretty-printed json
+
+  Includes ability to set autoprint without modifying tasks: `inv -D autoprint=unix my-task-name`
+
+* **Better error messages for end-users (see bugfixes for more)**::
+
+    inv testing arg0
+    old: 'testing' did not receive required positional arguments: 'important_arg1'.
+    new: 'testing' did not receive required positional arguments: 'important_arg1'.
+         Signature: testing <arg0> <important_arg1> --output-file <value>
+
 * **Single-step namespaced tasks!**
     Merges the very helpful
     `patch <https://github.com/pyinvoke/invoke/pull/527#issue-189000872>`_
@@ -74,13 +98,6 @@ adds support for lots of goodies:
       program.invoke(c, "infinite-recursing-task", recursed=True)
 
   `Longer explanation here. <https://github.com/pyinvoke/invoke/pull/613>`_
-
-* Autoprint styles + overriding from cmd-line::
-
-    @task(autoprint='unix')  # Prints lists new-line-separated, dicts tab-separated
-    @task(autoprint='json')  # Duh
-
-  Includes ability to set autoprint without modifying tasks: `inv -D autoprint=unix my-task-name`
 
 * **Bugfixes**
 
