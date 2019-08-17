@@ -603,8 +603,8 @@ class FileFlagChecker(object):
         except Exception as e:
             raise SaveReturnvalueError(*e.args)
         log.info(
-            "Done logging return value {!r} for {}() to {}. ".format(
-                ci.result, ci.name, self.last_result_path
+            "Done logging return value {} for {}() to {}. ".format(
+                make_printable(ci.result), ci.name, self.last_result_path
             )
         )
         log.debug(
@@ -620,6 +620,21 @@ class FileFlagChecker(object):
         )
         return pickle.load(self.last_result_path.open("rb"))
 
+
+def make_printable(obj):
+    try:
+        s = repr(obj)
+        if not s or len(s) <= 40:
+            return s
+
+        # 'superlong' --> 'super...', with accomodations for primitives like None
+        orig_terminator = s[-1]
+        terminator = orig_terminator if orig_terminator in ")'" else ''
+        s = s[:40] + "..." + terminator
+        return s
+
+    except Exception:
+        return ''
 
 def _is_task(o):
     return isinstance(o, Task)
