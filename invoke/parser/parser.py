@@ -316,10 +316,13 @@ class ParseMachine(StateMachine):
                 debug("Can't find context named {!r}, erroring".format(token))
                 # Should we also do this error for posargs? Can't know whether posarg or task, leave the original err
                 if is_flag(token):
-                    self.error("Task {!r} does not take an argument {!r}, only {}".format(
+                    self.error("Task {!r} does not take {}".format(
                         self.context.name,
-                        token,
-                        ', '.join(repr(x) for x in self.context.flags.keys())
+                        "an argument {!r}, only {}".format(
+                            self.context.name,
+                            token,
+                            ', '.join(repr(x) for x in self.context.flags.keys())
+                        ) if len(self.context.flags) else 'any flags, found {}'.format(token)
                     ))
                 self.error("No idea what {!r} is!".format(token))
             else:

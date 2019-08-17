@@ -169,7 +169,7 @@ class Task(object):
             except Exception as e:
                 # Shouldn't be necessary, but I have seen stacktraces that have
                 # no indicator of where the problem started..
-                log.exception("{} while calling {}(). Raising...".format(
+                log.error("{} while calling {}(). Raising...".format(
                     e.__class__.__name__, self.name)
                 )
                 if "'_force_run'" in str(e) or "'_clean'" in str(e):
