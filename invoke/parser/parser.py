@@ -342,12 +342,20 @@ class ParseMachine(StateMachine):
         )
         # Ensure all of context's positional args have been given.
         if self.context and self.context.missing_positional_args:
-            err = "'{}' did not receive required positional arguments: {}"
+            err = "'{}' did not receive required positional arguments: {}\nSignature: {}"
             names = ", ".join(
                 "'{}'".format(x.name)
                 for x in self.context.missing_positional_args
             )
-            self.error(err.format(self.context.name, names))
+            args = [arg.name for arg in self.context.positional_args]
+            kwargs = [arg + ' <value>' for arg in self.context.flags if arg.lstrip('-').replace('-', '_') not in args]
+            signature = '{} {}{}'.format(
+                self.context.name,
+                (' '.join('<{}>'.format(a) for a in args) + ' ') if args else '',
+                ' '.join(kwargs),
+            )
+            self.error(err.format(self.context.name, names, signature))
+
         if self.context and self.context not in self.result:
             self.result.append(self.context)
 
