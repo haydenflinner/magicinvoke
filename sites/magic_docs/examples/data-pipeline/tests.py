@@ -47,7 +47,7 @@ def test_this(ctx):
         CachePath('.minv').rm()
         Path('.minv').rm()
     else:
-        st = Path("people.txt").stat().st_mtime
+        st = Path("people.txt").stat().st_mtime if Path("people.txt").exists() else None
         ctx.run("inv get-people --clean")
         st1 = Path("people.txt").stat().st_mtime
         assert st != st1  # Clean should delete and re-run.
