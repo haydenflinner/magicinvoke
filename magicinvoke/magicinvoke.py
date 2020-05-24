@@ -12,12 +12,11 @@ from textwrap import dedent
 try:
     from pathlib import Path  # Py3
     from inspect import signature, Parameter
-except:
+except ImportError:
     from pathlib2 import Path  # Py2
     from funcsigs import signature, Parameter
 from invoke.config import names_for_ctx
 from invoke.util import raise_from
-from invoke.vendor.six.moves import filterfalse
 from invoke import Collection, task, Lazy, run  # noqa
 from invoke.tasks import Task
 from invoke.vendor.decorator import decorate
@@ -27,6 +26,7 @@ import cachepath  # noqa Add .rm to Paths
 from cachepath import CachePath
 
 from .exceptions import SaveReturnvalueError, DerivingArgsError
+
 
 def enable_logging(disable_invoke_logging=True):
     logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
@@ -45,6 +45,7 @@ for x in ("debug",):
 
 if os.getenv("MAGICINVOKE_TEST_DEBUG"):
     globals()["debug"] = print
+
 
 def _disable_logging_for_tests():
     log.setLevel(logging.CRITICAL)
@@ -84,7 +85,7 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
                        namedparam1=lambda ctx: ctx.myvalue * 4):
             print(namedparam1)  # 4, if myvalue == 1 :)
 
-    **Why do I need this?** Suppose this configuration\:
+    **Why do I need this?** Suppose this configuration:
 
     ``ctx = {"myfuncname" : {"requiredparam1" : 392, "namedparam2" : 199}}``
 
@@ -188,11 +189,13 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
             )
         if path.split(".")[0] not in names_for_ctx:
             raise ValueError(
-                "Path {!r} into ctx for {}()'s args must start with 'ctx.' or 'c.'"
-                .format(path, func_name)
+                "Path {!r} into ctx for {}()'s args must start with 'ctx.' or 'c.'".format(
+                    path, func_name
+                )
             )
-    user_passed_path = path  # Necessary because otherwise doesn't go into closure on py2.
-
+    user_passed_path = (
+        path  # Necessary because otherwise doesn't go into closure on py2.
+    )
 
     @functools.wraps(func)
     def customized_default_decorator(*args, **kwargs):
@@ -361,10 +364,10 @@ def get_params_from_ctx(func=None, path=None, derive_kwargs=None):
 InputPath = "input"
 OutputPath = "output"
 
+
 def _get_full_name(func):
     return "{}.{}".format(
-        func.__module__,
-        getattr(func, "__qualname__", func.__name__)
+        func.__module__, getattr(func, "__qualname__", func.__name__)
     )
 
 
@@ -374,6 +377,7 @@ def _hash_str(obj):
 
 def _hash_int(obj):
     return int(_hash_str(obj), 16)
+
 
 class CallInfo(object):
     def __repr__(self):
@@ -529,11 +533,13 @@ class CallInfo(object):
                 returning.append(param_name)
         return returning
 
+
 class FileTimestampChecker(object):
     """
     Checks timestamps of input and output files of a function to see if need to re-run.
     This checker doesn't maintain any state, so most call-backs just return none.
     """
+
     def can_skip(self, ci):
         res = timestamp_differ(ci.input_paths, ci.output_paths)
         return SkipResult(res[0], res[1])
@@ -628,7 +634,6 @@ class FileFlagChecker(object):
 
         return self._check_output_paths(ci)
 
-
     def _file_path_for_path(self, path):
         """
         Get the path to which the flags used to generate the file at 'path' are written to.
@@ -677,6 +682,7 @@ class FileFlagChecker(object):
 
 def _is_task(o):
     return isinstance(o, Task)
+
 
 # def skippable(func, checker_cls=FileFlagChecker):
 def skippable(func, decorator=None):
@@ -756,12 +762,12 @@ def skippable(func, decorator=None):
     """
     if decorator is None:
         decorator = SkippableDecorator()
+
     def _ignore_this_func(*args, **kwargs):
         return decorator(*args, **kwargs)
+
     decorator.attach_to_func(func)
     return decorate(func, _ignore_this_func)
-
-
 
 
 SkipResult = collections.namedtuple("SkipResult", ["skippable", "reason"])
@@ -770,6 +776,7 @@ SkipResult = collections.namedtuple("SkipResult", ["skippable", "reason"])
 class SkippableDecorator(object):
     """Just an object to allow customization / overriding. Used to be one long function.
     One is created per function decorated."""
+
     # Future alternative could be e.g. DBFileChecker.
     # TODO add file timestamp checker as a real checker.
     FuncCheckers = [FileFlagChecker, FileTimestampChecker]
@@ -903,8 +910,8 @@ def timestamp_differ(input_filenames, output_filenames):
     # All exist, now make sure oldest output is older than youngest input.
     PathInfo = collections.namedtuple("PathInfo", ["path", "modified"])
 
-    def sort_by_timestamps(l):
-        l = (PathInfo(path, Path(path).stat().st_mtime) for path in l)
+    def sort_by_timestamps(l_param):
+        l = (PathInfo(path, Path(path).stat().st_mtime) for path in l_param)
         return sorted(l, key=lambda pi: pi.modified)
 
     oldest_output = sort_by_timestamps(output_filenames)[0]

@@ -13,7 +13,6 @@ from .magicinvoke import (  # noqa
     InputPath,
     Lazy,
     OutputPath,
-
     # In case you need to run tests with capture=no
     _disable_logging_for_tests,
 )
@@ -22,7 +21,7 @@ from . import exceptions  # noqa
 # Things that are handy for everyone to have
 try:
     from pathlib import Path  # Py3
-except:
+except ImportError:
     from pathlib2 import Path  # Py2
 
 try:
