@@ -568,12 +568,13 @@ class FileFlagChecker(object):
                 for param_name, argument_value in ci.flags
             )
         )
-        debug("Determined call_str {!r} for {!r}".format(call_str, ci))
         return call_str
 
     def _get_hashed_call_str(self, ci):
         """Provides minimal security, minimizes file-size on calls with big params."""
-        return _hash_str(self._gen_call_str(ci).encode('utf-8'))
+        hashed_call_str = _hash_str(self._gen_call_str(ci).encode('utf-8'))
+        debug("Determined hashed_call_str {!r} for {!r}".format(hashed_call_str, ci))
+        return hashed_call_str
 
     def _get_cache_path(self, ci):
         """Returns the Path at which can find the previously written return value, if written before."""
@@ -581,7 +582,7 @@ class FileFlagChecker(object):
 
     def _check_output_paths(self, ci):
         """Check that all output files were generated with the same flags as this call to the function."""
-        failed_path = None
+        failed_path, old_flags = None, 'Not yet written'
         for output_path in ci.output_paths:
             if not output_path.exists():
                 return SkipResult(
@@ -589,18 +590,22 @@ class FileFlagChecker(object):
                 )
             flags_path = self._file_path_for_path(output_path)
             # debug("Checking {!r} for {!r}".format(flags_path, call_str))
-            if (
-                flags_path.exists()
-                and flags_path.read_bytes().decode() != ci._call_str
-            ):
+            if not flags_path.exists():
                 failed_path = output_path
                 break
+            contents = flags_path.read_bytes()
+            if contents != ci._call_str:
+                failed_path = output_path
+                old_flags = contents
+                break
+
         can_skip = not failed_path
         return SkipResult(
             can_skip,
-            "{} last generated with {} flags".format(
+            "{} last generated with {} flags{}".format(
                 ("%s was" % repr(failed_path)) if failed_path else "no files were",
                 "same" if can_skip else "different",
+                ": {}".format(old_flags) if failed_path else ""
             ),
         )
 
@@ -636,7 +641,7 @@ class FileFlagChecker(object):
 
         We go with 3 here.
         """
-        return CachePath(".minv", _hash_str(str(path)))
+        return CachePath(".minv", _hash_str(path))
 
     def clean(self, ci):
         for path in ci.output_paths:
@@ -752,7 +757,7 @@ def skippable(func, decorator=None):
     if decorator is None:
         decorator = SkippableDecorator()
     def _ignore_this_func(*args, **kwargs):
-        decorator(*args, **kwargs)
+        return decorator(*args, **kwargs)
     decorator.attach_to_func(func)
     return decorate(func, _ignore_this_func)
 
@@ -801,25 +806,28 @@ class SkippableDecorator(object):
         self._add_our_kwargs(func)
         self.func = func
 
-    def _clean_if_necessary(self, ci, kwargs_d):
-        clean = kwargs_d.pop("_clean", False)
-        if clean:
-            # Clean the output paths of the function.
-            log.info("Cleaning {!r}: {!r}!".format(ci.name, ci.output_paths))
-            for p in ci.output_paths:
-                p.rm()
-            # Tell the checker to clean any of its files.
-            self.func.checker.clean(ci)
-            debug("Cleaned all {} output files!".format(len(ci.output_paths)))
+    def _clean_if_necessary(self, clean, ci, kwargs_d):
+        if not clean:
+            return
+
+        # Clean the output paths of the function.
+        log.info("Cleaning {!r}: {!r}!".format(ci.name, ci.output_paths))
+        for p in ci.output_paths:
+            p.rm()
+        # Tell the checker to clean any of its files.
+        for checker in self.checkers:
+            checker.clean(ci)
+        debug("Cleaned all {} output files!".format(len(ci.output_paths)))
 
     def __call__(self, func, *args, **kwargs):
         """Call the function if required, otherwise return what was returned last time."""
         ci = CallInfo(self.func)
         # If someone passed these args to the function, they were meant for us.
         force_run = kwargs.pop("_force_run", False)
-        self._clean_if_necessary(ci, kwargs)
-
+        clean = kwargs.pop("_clean", False)
         ci.bind(args, kwargs)
+
+        self._clean_if_necessary(clean, ci, kwargs)
 
         debug("for func {}, inputs: {} outputs: {}".format(ci.name, ci.input_paths, ci.output_paths))
         # Not necessary in Python, but makes clear that leak from loop is intentional :-)

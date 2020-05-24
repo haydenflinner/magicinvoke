@@ -47,7 +47,10 @@ def test_this(ctx):
         CachePath('.minv').rm()
         Path('.minv').rm()
     else:
-        assert "cleaned all" in ctx.run("inv get-peoples-ages --clean").stdout.lower()
+        st = Path("people.txt").stat().st_mtime
+        ctx.run("inv get-people --clean")
+        st1 = Path("people.txt").stat().st_mtime
+        assert st != st1  # Clean should delete and re-run.
 
     def bprint(s):
         print(Style.BRIGHT + s + Style.RESET_ALL)
@@ -85,7 +88,7 @@ def test_this(ctx):
         # If you fail here it's because we assume how minv implemented these paths :)
         CachePath('.minv', 'tasks.get_peoples_ages').rm()
     else:
-        ctx.run("invoke get-peoples-ages --clean")
+        ctx.run("invoke get-people --clean")
     both_ran(ctx.run("invoke print-peoples-ages").stdout)
 
     bprint("We're good!")
