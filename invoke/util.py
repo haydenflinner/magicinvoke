@@ -28,6 +28,7 @@ try:
     from .vendor import six
     from .vendor.six.moves import reduce  # noqa
     from .vendor.decorator import getfullargspec  # noqa
+    from .vendor.six import raise_from, iteritems  # noqa
 
     if six.PY3:
         from .vendor import yaml3 as yaml  # noqa
@@ -40,8 +41,7 @@ except ImportError:
     import six
     from six.moves import reduce  # noqa
     import yaml  # noqa
-
-from six import raise_from, iteritems  # noqa
+    from six import raise_from, iteritems  # noqa
 
 LOG_FORMAT = "%(name)s.%(module)s.%(funcName)s: %(message)s"
 
