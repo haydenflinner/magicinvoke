@@ -1,9 +1,14 @@
 from __future__ import print_function
-from collections import OrderedDict, MutableMapping
+from collections import OrderedDict
 from json import dumps
 from pprint import pprint
 from sys import version_info
 from inspect import ismethod
+
+try:
+    from collections.abc import MutableMapping
+except ImportError:
+    from collections import MutableMapping
 
 # for debugging
 def here(item=None):
@@ -37,7 +42,7 @@ class DotMap(MutableMapping, OrderedDict):
 					self._map[k] = v
 		if kwargs:
 			for k,v in self.__call_items(kwargs):
-				if k is not '_dynamic':
+				if k != '_dynamic':
 					self._map[k] = v
 
 	def __call_items(self, obj):
