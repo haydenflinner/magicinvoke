@@ -1,10 +1,15 @@
-from collections import namedtuple, Iterable
+from collections import namedtuple
 from contextlib import contextmanager
 import io
 import logging
 import os
 import threading
 import sys
+
+try:
+    from collections import Iterable
+except ImportError:
+    from collections.abc import Iterable
 
 # NOTE: This is the canonical location for commonly-used vendored modules,
 # which is the only spot that performs this try/except to allow repackaged
